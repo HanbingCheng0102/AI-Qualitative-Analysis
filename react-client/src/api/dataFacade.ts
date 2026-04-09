@@ -747,3 +747,18 @@ export async function cluster_updateLabel(clusterId: string, newLabel: string) {
 export async function cluster_updateFragmentAssignment(fragmentId: string, newClusterId: string) {
     return await storage.updateFragmentCluster(fragmentId, newClusterId);
 }
+
+/** Save a researcher note on a fragment. */
+export async function fragment_saveNote(fragmentId: string, note: string) {
+    return await storage.updateItem("fragments", fragmentId, { note });
+}
+
+/** Save a researcher note on a cluster. */
+export async function cluster_saveNote(clusterId: string, note: string) {
+    return await storage.updateItem("clusters", clusterId, { note });
+}
+
+/** Delete an entire survey dataset (document, fragments, clusters, feedback). */
+export async function survey_delete(docId: string) {
+    return await storage.deleteSurveyDataset(docId);
+}

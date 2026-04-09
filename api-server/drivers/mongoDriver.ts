@@ -176,6 +176,26 @@ class MongoDriver implements StorageDriver {
     return result.modifiedCount;
   }
 
+  /**
+   * Delete an entire survey dataset: document, all its fragments, clusters, and feedback.
+   */
+  public async deleteSurveyDataset(docId: string): Promise<void> {
+    const db = await this.getDb();
+    const oid = this.normalizeId(docId);
+
+    // Find cluster IDs for this survey so we can delete feedback too
+    const clusterIds = (await db.collection("clusters").find({ survey_doc_id: oid }, { projection: { _id: 1 } }).toArray())
+      .map(c => c._id);
+
+    await db.collection("clusterFeedback").deleteMany({ doc_id: oid });
+    if (clusterIds.length) {
+      await db.collection("clusterFeedback").deleteMany({ to_cluster_id: { $in: clusterIds } });
+    }
+    await db.collection("clusters").deleteMany({ survey_doc_id: oid });
+    await db.collection("fragments").deleteMany({ docid: oid });
+    await db.collection("documents").deleteOne({ _id: oid });
+  }
+
 }
 
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSetAtom } from "jotai";
 import { clusterRunStatus, selectedClusterId } from "../state";
@@ -8,6 +8,7 @@ import {
     pipeline_runClustering,
     pipeline_labelClusters,
 } from "../api/aiServiceFacade";
+import { documents_findAll, survey_delete } from "../api/dataFacade";
 
 // ── Step definitions ──────────────────────────────────────────────────────────
 const STEPS = [
@@ -68,6 +69,29 @@ export default function SurveyIngestionView() {
 
     const setRunStatus = useSetAtom(clusterRunStatus);
     const setSelectedCluster = useSetAtom(selectedClusterId);
+
+    // Dataset manager
+    const [datasets, setDatasets]         = useState([]);
+    const [deleteTarget, setDeleteTarget] = useState(null); // doc being confirmed
+    const [deleting, setDeleting]         = useState(false);
+
+    useEffect(() => {
+        documents_findAll().then(setDatasets).catch(console.error);
+    }, []);
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        try {
+            await survey_delete(deleteTarget._id.toString());
+            setDatasets(prev => prev.filter(d => d._id.toString() !== deleteTarget._id.toString()));
+            setDeleteTarget(null);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     const setStep = (id, status, detail = null) => {
         setStepStatus(s => ({ ...s, [id]: status }));
@@ -217,7 +241,7 @@ export default function SurveyIngestionView() {
 
             {/* ── Success + navigate ── */}
             {result && !error && (
-                <div className="p-5 rounded-lg bg-green-50 border border-green-300">
+                <div className="p-5 rounded-lg bg-green-50 border border-green-300 mb-8">
                     <p className="text-green-800 font-semibold text-lg mb-1">Pipeline complete!</p>
                     <p className="text-green-700 text-sm mb-4">
                         {result.cluster_count} themes discovered from your survey.
@@ -228,6 +252,76 @@ export default function SurveyIngestionView() {
                     >
                         View Cluster Graph →
                     </button>
+                </div>
+            )}
+
+            {/* ── Dataset manager ── */}
+            <div className="mt-4">
+                <h2 className="text-base font-bold text-gray-700 mb-3">Uploaded Datasets</h2>
+                {datasets.length === 0 && (
+                    <p className="text-sm text-gray-400">No datasets uploaded yet.</p>
+                )}
+                <div className="space-y-2">
+                    {datasets.map(doc => (
+                        <div
+                            key={doc._id.toString()}
+                            className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 bg-white"
+                        >
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-800 truncate">{doc.name}</p>
+                                <p className="text-xs text-gray-400 font-mono">{doc._id.toString()}</p>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0 ml-4">
+                                <button
+                                    onClick={() => navigate("/cluster-graph", { state: { doc_id: doc._id.toString() } })}
+                                    className="text-xs px-3 py-1.5 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors"
+                                >
+                                    View graph
+                                </button>
+                                <button
+                                    onClick={() => setDeleteTarget(doc)}
+                                    className="text-xs px-3 py-1.5 rounded border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Delete confirmation modal ── */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-96">
+                        <h3 className="text-base font-bold text-gray-800 mb-2">Delete dataset?</h3>
+                        <p className="text-sm text-gray-500 mb-1">
+                            This will permanently delete:
+                        </p>
+                        <ul className="text-sm text-gray-600 list-disc list-inside mb-4 space-y-0.5">
+                            <li>The survey document <strong>{deleteTarget.name}</strong></li>
+                            <li>All its fragments and embeddings</li>
+                            <li>All clusters and labels</li>
+                            <li>All manual placement feedback</li>
+                        </ul>
+                        <p className="text-sm text-red-600 font-medium mb-5">This cannot be undone.</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={deleting}
+                                className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                            >
+                                {deleting ? "Deleting…" : "Yes, delete"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

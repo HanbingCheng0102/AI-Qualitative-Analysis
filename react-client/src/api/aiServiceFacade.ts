@@ -95,3 +95,32 @@ export async function pipeline_recordFeedback(
         user_note: userNote,
     });
 }
+
+/**
+ * Get total number of manual placement events for a survey doc.
+ * Returns { count: number }
+ */
+export async function pipeline_getFeedbackCount(docId: string) {
+    const res = await fetch(`${AI_URI}/feedback/count/${docId}`);
+    if (!res.ok) throw new Error(`Feedback count error: ${res.status}`);
+    return res.json() as Promise<{ count: number }>;
+}
+
+/**
+ * Get AI-suggested cluster placements for uncategorised fragments.
+ * Should only be called after >= 20 manual placements.
+ * Returns { suggestions: [...] }
+ */
+export async function pipeline_suggestPlacements(docId: string) {
+    return post("/feedback/suggest", { doc_id: docId }) as Promise<{
+        suggestions: {
+            fragment_id: string;
+            fragment_name: string;
+            fragment_text: string;
+            suggested_cluster_id: string;
+            suggested_cluster_label: string;
+            suggested_cluster_color: string;
+            confidence: number;
+        }[];
+    }>;
+}

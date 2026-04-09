@@ -40,6 +40,8 @@ interface StorageDriver {
     updateClusterLabel(clusterId: string, newLabel: string): Promise<number>;
 
     updateFragmentCluster(fragmentId: string, newClusterId: string): Promise<number>;
+
+    deleteSurveyDataset(docId: string): Promise<void>;
 }
 
 
