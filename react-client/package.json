@@ -8,8 +8,10 @@
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "dev:all": "concurrently \"npm run dev\" \"npm run api\"",
-    "api": "cd ../api-server && npx tsx index.ts"
+    "predev:all": "npx kill-port 3000 5173 8000 || true",
+    "dev:all": "concurrently --names \"react,api,ai\" --prefix-colors \"cyan,yellow,magenta\" \"npm run dev\" \"npm run api\" \"npm run ai\"",
+    "api": "cd ../api-server && npx tsx index.ts",
+    "ai": "cd ../ai-service && venv\\Scripts\\uvicorn main:app --reload --port 8000 --host 0.0.0.0"
   },
   "dependencies": {
     "@browsery/util": "^0.12.5",
@@ -26,6 +28,8 @@
     "fabric": "^6.0.0",
     "fabricjs-react": "^1.2.2",
     "flatted": "^3.3.1",
+    "graphology": "^0.26.0",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "html-react-parser": "^5.1.10",
     "html-to-image": "^1.11.11",
     "html2canvas": "^1.4.1",
@@ -45,6 +49,7 @@
     "react-image-crop": "^11.0.5",
     "react-router-dom": "^6.23.1",
     "realm-web": "^2.0.1",
+    "sigma": "^3.0.2",
     "sort-by": "^1.2.0",
     "util": "^0.12.5",
     "xlsx": "^0.18.5"
@@ -59,6 +64,7 @@
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
+    "kill-port": "^2.0.1",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "vite": "^5.4.2"

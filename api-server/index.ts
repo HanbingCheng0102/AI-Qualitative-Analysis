@@ -5,7 +5,13 @@ import { DriverFactory } from "./drivers/driverFactory.ts";
 import StorageDriver from "./drivers/storageDriver.ts";
 
 import env from "dotenv";
-env.config();
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+// Walk up to find the root .env (shared with ai-service)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+env.config({ path: resolve(__dirname, "../../.env") });
+env.config(); // also load local .env if present, without overriding
 
 
 async function main() {

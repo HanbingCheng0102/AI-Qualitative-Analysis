@@ -1,4 +1,4 @@
-# Logs
+# ── Logs ─────────────────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,12 +7,33 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# ── Build output ──────────────────────────────────────────────────────────────
 dist
 dist-ssr
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+react-client/node_modules/
+api-server/node_modules/
+
+# ── Python virtualenv ─────────────────────────────────────────────────────────
+ai-service/venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# ── Environment / secrets — NEVER commit these ────────────────────────────────
+.env
+.env.*
+.env.local
+.env.*.local
 *.local
 
-# Editor directories and files
+# ── Editor directories ────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,11 +43,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
 
-# Node modules
-node_modules/
-
-
-#nothing yet
+# ── Misc ──────────────────────────────────────────────────────────────────────
 jsdoc/
-.env

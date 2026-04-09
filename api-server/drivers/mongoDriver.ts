@@ -24,15 +24,19 @@ class MongoDriver implements StorageDriver {
 
   public async getDb() {
 
-    const dbName = new URL(this.options.connectionString).pathname.replace(/((^\/+)|(\/+$))/g, "");
-    if (!dbName) throw new Error("Database name is not specified in MONGO_URI");
+    // Prefer MONGO_DB_NAME env var; fall back to parsing the URI path
+    const dbName =
+      process.env.MONGO_DB_NAME ||
+      new URL(this.options.connectionString).pathname.replace(/((^\/+)|(\/+$))/g, "");
+
+    if (!dbName) throw new Error("Database name is not specified. Set MONGO_DB_NAME in your .env file.");
 
     if (!this.clientPromise) {
       this.clientPromise = MongoClient.connect(this.options.connectionString);
     }
-    
+
     const client = await this.clientPromise;
-    return client.db();
+    return client.db(dbName);
   }
 
   public async addNewItem(collectionName: string, item: any) {
@@ -131,6 +135,45 @@ class MongoDriver implements StorageDriver {
   public async getAllFloors(): Promise<any[]> {
     const db = await this.getDb();
     return db.collection("virtualFloors").find({}).toArray();
+  }
+
+  public async getClusters(surveyDocId: string): Promise<any[]> {
+    const db = await this.getDb();
+    return db.collection("clusters").find({ survey_doc_id: this.normalizeId(surveyDocId) }).toArray();
+  }
+
+  public async getCluster(clusterId: string): Promise<any> {
+    const db = await this.getDb();
+    return db.collection("clusters").findOne({ _id: this.normalizeId(clusterId) });
+  }
+
+  public async getFragmentsByCluster(clusterId: string): Promise<any[]> {
+    const db = await this.getDb();
+    return db.collection("fragments").find({ cluster_id: this.normalizeId(clusterId) }).toArray();
+  }
+
+  public async recordClusterFeedback(feedbackObj: any): Promise<string> {
+    const db = await this.getDb();
+    const result = await db.collection("clusterFeedback").insertOne(feedbackObj);
+    return result.insertedId.toString();
+  }
+
+  public async updateClusterLabel(clusterId: string, newLabel: string): Promise<number> {
+    const db = await this.getDb();
+    const result = await db.collection("clusters").updateOne(
+      { _id: this.normalizeId(clusterId) },
+      { $set: { label: newLabel } }
+    );
+    return result.modifiedCount;
+  }
+
+  public async updateFragmentCluster(fragmentId: string, newClusterId: string): Promise<number> {
+    const db = await this.getDb();
+    const result = await db.collection("fragments").updateOne(
+      { _id: this.normalizeId(fragmentId) },
+      { $set: { feedback_cluster_id: this.normalizeId(newClusterId) } }
+    );
+    return result.modifiedCount;
   }
 
 }

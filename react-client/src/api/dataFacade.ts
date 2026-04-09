@@ -679,3 +679,71 @@ export async function floors_findAll() {
 
     return vfs
 }
+
+/**
+ * Fetches all clusters for a given survey document.
+ *
+ * @export
+ * @param {string} surveyDocId
+ * @return {Array<object>}
+ */
+export async function clusters_findAll(surveyDocId: string) {
+    return await storage.getClusters(surveyDocId);
+}
+
+/**
+ * Fetches a single cluster by ID.
+ *
+ * @export
+ * @param {string} clusterId
+ * @return {object}
+ */
+export async function cluster_find(clusterId: string) {
+    return await storage.getCluster(clusterId);
+}
+
+/**
+ * Fetches all fragments belonging to a cluster.
+ *
+ * @export
+ * @param {string} clusterId
+ * @return {Array<object>}
+ */
+export async function cluster_getFragments(clusterId: string) {
+    return await storage.getFragmentsByCluster(clusterId);
+}
+
+/**
+ * Records a manual re-coding event (user moved a fragment to a different cluster).
+ *
+ * @export
+ * @param {object} feedbackObj - { fragment_id, from_cluster_id, to_cluster_id, user_note }
+ * @return {string} inserted ID
+ */
+export async function cluster_recordFeedback(feedbackObj: any) {
+    return await storage.recordClusterFeedback(feedbackObj);
+}
+
+/**
+ * Updates the label of a cluster (after LLM re-labelling or manual edit).
+ *
+ * @export
+ * @param {string} clusterId
+ * @param {string} newLabel
+ * @return {number} modified count
+ */
+export async function cluster_updateLabel(clusterId: string, newLabel: string) {
+    return await storage.updateClusterLabel(clusterId, newLabel);
+}
+
+/**
+ * Records that a fragment has been manually reassigned to a different cluster.
+ *
+ * @export
+ * @param {string} fragmentId
+ * @param {string} newClusterId
+ * @return {number} modified count
+ */
+export async function cluster_updateFragmentAssignment(fragmentId: string, newClusterId: string) {
+    return await storage.updateFragmentCluster(fragmentId, newClusterId);
+}

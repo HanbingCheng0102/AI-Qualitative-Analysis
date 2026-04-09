@@ -67,35 +67,34 @@ function MyFragments(){
     
 
     return (
-    <>
-    <h1 className="title-location-myfrag mb-4 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-2xl lg:text-3xl dark:text-white">My Fragments</h1>
-    <div className="fragment-filter-location w-72 text-black pb-4 z-50">
-        <Select size="md" label="Specify a document" className="bg-white"
-            onChange={(val) => {
-                filterFrags(val)
-                setDocIDStr(val)
-            }} value={docIDStr}>
-            <Option value={""} key={"any"} className='text-left'>
-            <Typography color="black">*ALL DOCUMENTS*</Typography>
-                
-            </Option>
-            {docsWithFrags.map((item, index) => (
-                <Option value={item._id.toString()} key={item.name + index} className='text-left' >
-                    <Typography color="black">
-                        {item.name + " - " + item._id.toString()}
-                    </Typography>
-                </Option>
-            ))}
-        </Select>
+    <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
+      <div className="flex items-center gap-4 flex-shrink-0">
+        <h1 className="text-lg font-bold text-gray-900">My Fragments</h1>
+        <div className="w-72 text-black z-50">
+          <Select size="md" label="Filter by document" className="bg-white"
+              onChange={(val) => {
+                  filterFrags(val)
+                  setDocIDStr(val)
+              }} value={docIDStr}>
+              <Option value={""} key={"any"} className='text-left'>
+              <Typography color="black">*ALL DOCUMENTS*</Typography>
+              </Option>
+              {docsWithFrags.map((item, index) => (
+                  <Option value={item._id.toString()} key={item.name + index} className='text-left' >
+                      <Typography color="black">
+                          {item.name + " - " + item._id.toString()}
+                      </Typography>
+                  </Option>
+              ))}
+          </Select>
+        </div>
+      </div>
 
+      <div className="flex flex-1 gap-4 min-h-0 overflow-hidden">
+        <FragmentGrid subsetList={subsetList} selectedFragment={selectedFragment} setSelectedFragment={setSelectedFragment}></FragmentGrid>
+        {selectedFragment != null ? <FragmentEditorPanel selectedFragment={selectedFragment}></FragmentEditorPanel> : <></>}
+      </div>
     </div>
-
-    <FragmentGrid subsetList={subsetList} selectedFragment={selectedFragment} setSelectedFragment={setSelectedFragment}></FragmentGrid>
-
-    {selectedFragment != null ? <FragmentEditorPanel selectedFragment={selectedFragment}></FragmentEditorPanel> : <></>}
-    
-    
-    </>
     )
 }
 

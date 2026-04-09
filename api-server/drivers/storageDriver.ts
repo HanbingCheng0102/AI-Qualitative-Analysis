@@ -28,6 +28,18 @@ interface StorageDriver {
     getAllAnnotations(): Promise<any[]>;
 
     getAllFloors(): Promise<any[]>;
+
+    getClusters(surveyDocId: string): Promise<any[]>;
+
+    getCluster(clusterId: string): Promise<any>;
+
+    getFragmentsByCluster(clusterId: string): Promise<any[]>;
+
+    recordClusterFeedback(feedbackObj: any): Promise<string>;
+
+    updateClusterLabel(clusterId: string, newLabel: string): Promise<number>;
+
+    updateFragmentCluster(fragmentId: string, newClusterId: string): Promise<number>;
 }
 
 

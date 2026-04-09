@@ -908,16 +908,17 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
     
     return(
         <>
-        <div id="hi" className='component-block'>
-            <div className='component-block-vert-xsmall'>
-                
+        <div className='floor-layout'>
+            <div className='floor-canvas-area'>
                 <FabricJSCanvas className="floorcanvas" onReady={onReady} style={{width : x_canvasSize.toString() + "px", height : y_canvasSize.toString() + "px"}} />
-                <button className='reset-button hover:bg-red-100 shadow-xl shadow-gray-400 outline outline-1 text-red-500' onClick={doReset}>Reset Canvas</button>
-                {savedIDState != null ? <button className='save-button hover:bg-green-100 shadow-xl shadow-gray-400 outline outline-1 text-green-500' onClick={updateSave}>Save</button> : <></>}
-                <button className='save-as-button hover:bg-green-100 shadow-xl shadow-gray-400 outline outline-1 text-green-500' onClick={openSaveDialog}>Save As</button>
+                <div className='floor-actions'>
+                    <button className='hover:bg-red-100 shadow shadow-gray-400 outline outline-1 text-red-500 px-3 py-1 rounded' onClick={doReset}>Reset Canvas</button>
+                    {savedIDState != null ? <button className='hover:bg-green-100 shadow shadow-gray-400 outline outline-1 text-green-600 px-3 py-1 rounded' onClick={updateSave}>Save</button> : <></>}
+                    <button className='hover:bg-green-100 shadow shadow-gray-400 outline outline-1 text-green-600 px-3 py-1 rounded' onClick={openSaveDialog}>Save As</button>
+                </div>
             </div>
-            <div className='component-block-vert-small'>
-                {thisf2cRef.current != null ? 
+            <div className='floor-right-panel'>
+                {thisf2cRef.current != null ?
                 <FragmentSelector fragmentList={fragmentList} setFragmentList={setFragmentList} spawnFragment={spawnFragment} f2lRef={thisf2cRef} bulkSpawn={bulkSpawn}></FragmentSelector>
                 : <></>}
                 <AnnotationCreator selObjRef={selObjRef} f2lRef={thisf2cRef} onAnnotCreated={onAnnotCreated}></AnnotationCreator>
@@ -932,7 +933,7 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
         {/* Save Floor Dialog */}
         <Dialog open={openDia} handler={toggleDialog} size="sm" className='!text-black'>
           <DialogHeader>
-            <h1 className="text-3xl">Name the new Virtual Floor</h1>
+            <h1 className="text-lg font-semibold">Name the new Virtual Floor</h1>
             </DialogHeader>
           <DialogBody>
           
@@ -963,7 +964,7 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
               variant="text"
               color="red"
               onClick={toggleDialog}
-              className="mr-1 text-lg"
+              className="mr-1 text-sm"
             >
               <span>Cancel</span>
             </Button>
@@ -971,7 +972,7 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
               variant="text"
               color="green"
               onClick={handleSaveConfirmed}
-              className="mr-1 text-lg"
+              className="mr-1 text-sm"
             >
               <span>Save</span>
             </Button>

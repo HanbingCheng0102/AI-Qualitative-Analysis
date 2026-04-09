@@ -2,409 +2,235 @@
 @tailwind components;
 @tailwind utilities;
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ═══════════════════════════════════════════════════════════════
+   APP SHELL  —  sidebar + scrollable main area
+═══════════════════════════════════════════════════════════════ */
+
+.app-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.side-panel {
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.main-content {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow: auto;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* ═══════════════════════════════════════════════════════════════
+   VIRTUAL FLOOR
+═══════════════════════════════════════════════════════════════ */
+
+.floor-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.card {
-  padding: 2em;
+.floor-canvas-area {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
 }
 
-.read-the-docs {
-  color: #888;
+.floorcanvas {
+  border: 2px solid #0d0e11;
+  box-shadow: 4px 4px #c7c9e7;
+  flex-shrink: 0;
 }
 
-.bottom-three {
-     margin-bottom: 3cm;
-}
-.bottom-one {
-  margin-bottom: 1cm;
-}
-
-.bottom-onefive {
-  margin-bottom: 1.5cm;
+.floor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 0;
 }
 
-.top-space {
-  margin-top: 2cm;
+.floor-right-panel {
+  width: 300px;
+  min-width: 300px;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-left: 1px solid #e2e8f0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOCUMENT VIEWER
+═══════════════════════════════════════════════════════════════ */
+
+.docviewer {
+  padding: 16px;
+  height: 100%;
+  overflow: auto;
 }
 
 .html-window {
-  margin-left: 3cm;
-  position: fixed;
-  left: 1050px;
+  flex: 1;
+  min-width: 0;
 }
 
 .html-content-view {
-  border:3px solid#362158;
-  max-height: 900px;
-  max-width: 750px;
-  overflow-y:auto
+  border: 3px solid #362158;
+  max-height: calc(100vh - 140px);
+  max-width: 100%;
+  overflow-y: auto;
 }
 
-.component-block{
-  display:flex; 
-  flex-direction:rowl;
+/* ═══════════════════════════════════════════════════════════════
+   FRAGMENT EXTRACTOR — TEXTUAL
+═══════════════════════════════════════════════════════════════ */
+
+.selector-textual-position {
+  padding: 16px;
+}
+
+.doc-selector-width {
+  width: 320px;
+  min-width: 260px;
+}
+
+.doc-selector-card {
+  width: 320px;
+  height: calc(100vh - 180px);
+  max-height: 520px;
+}
+
+.textual-selector-width {
+  flex: 1;
+  min-width: 360px;
+}
+
+.textual-selector-card {
   width: 100%;
-  height: 600px;
-  gap: 100px;
+  height: calc(100vh - 180px);
+  max-height: 520px;
 }
-.component-block-dia{
-  display:flex; 
-  flex-direction:rowl;
+
+.frag-creator-location-textual {
+  padding: 0 16px 16px;
+}
+
+.frag-creator-card-textual {
   width: 100%;
-  gap: 100px;
+  max-width: 100%;
 }
 
-.component-block-short{
-  display:flex; 
-  flex-direction:rowl;
-  width: 100%;
-  height: 440px;
-  gap: 100px;
+/* ═══════════════════════════════════════════════════════════════
+   MY FRAGMENTS
+═══════════════════════════════════════════════════════════════ */
+
+.title-location-myfrag {
+  /* was position:fixed top:50px left:975px — now normal flow */
 }
 
-.component-block-annot{
-  display:flex; 
-  flex-direction:rowl;
-  width: 100%;
-  height: px;
-  gap: 25px;
+.fragment-filter-location {
+  /* was position:fixed top:125px left:450px — now normal flow */
 }
 
-.component-block-xshort{
-  display:flex; 
-  flex-direction:rowl;
-  width: 100%;
-  height: 100px;
-  gap: 100px;
+.fragment-grid-location {
+  /* was position:fixed top:200px left:450px — keep grid behaviour */
 }
 
-.component-block-vert{
-  display:flex; 
-  flex-direction:column;
-  width: 100%;
-  height: 1000px;
-  gap: 100px;
+.fragment-editor-location {
+  /* was position:fixed left:1800px — now normal flow */
 }
 
-.component-block-vert-small{
-  display:flex; 
-  flex-direction:column;
-  width: 100%;
-  gap: 50px;
+/* ═══════════════════════════════════════════════════════════════
+   FRAGMENT IMAGE
+═══════════════════════════════════════════════════════════════ */
+
+.topleft {
+  padding: 16px;
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  height: 100%;
+  overflow: auto;
+  align-items: flex-start;
 }
 
-.component-block-vert-xsmall{
-  display:flex; 
-  flex-direction:column;
-  width: 100%;
-  gap: 10px;
+.cropper {
+  max-width: 600px;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
 }
 
-.component-block-vert-xsmall2{
-  display:flex; 
-  flex-direction:column;
-  width: 100%;
-  gap: 15px;
+.imgpreview {
+  max-width: 600px;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
 }
 
-.component-block-vert-xsmall3{
-  display:flex; 
-  flex-direction:column;
-  gap: 15px;
+/* ═══════════════════════════════════════════════════════════════
+   MISC COMPONENTS
+═══════════════════════════════════════════════════════════════ */
+
+.fragment-box {
+  border: 1px solid #362158;
+  padding: 10px;
+  box-shadow: 2px 2px #d3d1d1;
+  max-width: 300px;
+  max-height: 400px;
 }
 
-.document-select-multiple{
-  position: fixed;
-  top: 40px;
-  left: 390px;
-}
-
-.scrollable-selector{
-  display:flex; 
-  flex-direction:column;
-  overflow-y:auto;
+.scrollable-selector {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
   gap: 8px;
   text-align: left;
-  width: 350px;
   max-height: 425px;
 }
 
-.selected-view{
-  display:flex; 
-  flex-direction:column;
-  width: 400px;
-  height: 500px;
-  gap: 10px;
-
-  position: fixed;
-  top: 40px;
-  left: 700px;
-}
-
-.selected-view-vf{
-  display:flex; 
-  flex-direction:column;
-  width: 550px;
-  height: 125px;
-  overflow-y:auto;
+.selected-view-vf {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 125px;
+  overflow-y: auto;
   text-align: left;
 }
 
-.results-and-create{
-  position: fixed;
-  top: 40px;
-  left: 1100px;
-  width: 700px;
-}
-
-.add-all-button{
-  position: fixed;
-  top: 200px;
-  left: 1550px;
-}
-
-
-
-.side-panel{
-  display: inline-block;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 500px;
-}
-
-.list-group{
+.list-group {
   overflow-y: auto;
   max-height: 360px;
 }
 
-.list-group-lol{
-  width: 450px;
-}
-
-.fragment-box {
-  border:1px solid#362158;
-  padding: 10px;
-  box-shadow: 5px 5px #d3d1d1;
-  max-width: 300px;
-  max-height: 400px
-}
-
-.floorcanvas {
-  border:2px solid#0d0e11;
-  position: fixed;
-  left: 400px;
-  top: 25px;
-  box-shadow: 5px 5px #c7c9e7;
-}
-
-.vf-title{
-  position: fixed;
-  left: 900px;
-  top: 20px;
-  font-size: 30pt;
-  font-weight: 700;
-}
-
-.pick-frags{
-  position: fixed;
-  left: 1975px;
-  top: 20px;
-}
-
-.annotation-creator{
-  position: fixed;
-  left: 1975px;
-  top: 625px;
-  width: 575px;
-  height: 600px;
-}
-
-.frags-for-annot{
-  display:inline;
-  margin: 0 5px
-}
-
-.query-options{
-  position: fixed;
-  left: 400px;
-  top: 550px;
-  width: 650px;
-}
-
-
-.component-block-query{
-  display:flex; 
-  flex-direction:rowl;
+.list-group-lol {
   width: 100%;
-  gap: 100px;
-  white-space: nowrap;
-  margin-bottom: 20px;
 }
 
-.component-block-switch{
-  display:flex; 
-  flex-direction:rowl;
-  width: 100%;
-  gap: 30px;
-  white-space: nowrap;
-  margin-bottom: 20px;
+.fragment-selector {
+  max-height: 585px;
+  overflow-y: auto;
 }
 
-.file-uploader{
-  display: flex;
-  flex-direction:column;
-  gap: 20px;
-}
-
-.docviewer{
-  position: fixed;
-  top: 100px;
-  left: 500px;
-}
-
-.topleft{
-  position: fixed;
-  top: 100px;
-  left: 500px;
-}
-
-.cropper{
-  position: fixed;
-  top: 100px;
-  left: 850px;
-  max-width: 600px;
-  max-height: 800px;
-}
-.imgpreview{
-  position: fixed;
-  top: 100px;
-  left: 1575px;
-  max-width: 600px;
-  max-height: 800px;
-}
-
-.reset-button{
-  position: fixed;
-  top: 1290px;
-  left: 400px;
-}
-
-.save-button{
-  position: fixed;
-  top: 1290px;
-  left: 1710px;
-}
-
-.save-as-button{
-  position: fixed;
-  top: 1290px;
-  left: 1810px;
-}
-
-.selector-textual-position{
-  position: fixed;
-  top: 50px;
-  left: 500px
-}
-
-.doc-selector-width{
-  width: 500px;
-  min-width: 500px;
-}
-.doc-selector-card{
-  width: 550px;
-  height: 500px;
-}
-
-.textual-selector-width{
-  width: 800px;
-  max-width: 800px;
-  min-width: 800px;
-}
-.textual-selector-card{
-  width: 850px;
-  height: 500px;
-}
-
-.frag-creator-location-textual{
-  position: fixed;
-  top: 700px;
-  left: 500px
-}
-
-.frag-creator-card-textual{
-  position: fixed;
-  top: 650px;
-  left: 650px;
-  min-width: 1200px;
-  width: 1200px;
-}
-
-.fragment-selector{
-  max-height: 585px
-}
-
-.fragment-selector-list{
+.fragment-selector-list {
   max-height: 200px;
-  height: 200px
-}
-
-.title-location-myfrag{
-  position: fixed;
-  top: 50px;
-  left: 975px;
-}
-
-.fragment-filter-location{
-  position: fixed;
-  top: 125px;
-  left: 450px;
-}
-
-.fragment-grid-location{
-  position: fixed;
-  top: 200px;
-  left: 450px;
-}
-
-.fragment-editor-location{
-  position: fixed;
-  left: 1800px;
-  top: 50px;
+  height: 200px;
 }
 
 .annot-box {
@@ -414,3 +240,36 @@
   margin-bottom: 15px;
   clear: both;
 }
+
+.file-uploader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEGACY COMPONENT BLOCKS
+   (flex-direction:rowl typo fixed; rigid heights removed)
+═══════════════════════════════════════════════════════════════ */
+
+.component-block          { display: flex; flex-direction: row;    flex-wrap: wrap; gap: 16px; }
+.component-block-dia      { display: flex; flex-direction: row;    gap: 16px; }
+.component-block-short    { display: flex; flex-direction: row;    gap: 16px; }
+.component-block-annot    { display: flex; flex-direction: row;    gap: 25px; }
+.component-block-xshort   { display: flex; flex-direction: row;    gap: 16px; }
+.component-block-query    { display: flex; flex-direction: row;    gap: 16px; white-space: nowrap; margin-bottom: 20px; }
+.component-block-switch   { display: flex; flex-direction: row;    gap: 16px; white-space: nowrap; margin-bottom: 20px; }
+.component-block-vert         { display: flex; flex-direction: column; gap: 16px; }
+.component-block-vert-small   { display: flex; flex-direction: column; gap: 16px; }
+.component-block-vert-xsmall  { display: flex; flex-direction: column; gap: 8px; }
+.component-block-vert-xsmall2 { display: flex; flex-direction: column; gap: 12px; }
+.component-block-vert-xsmall3 { display: flex; flex-direction: column; gap: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SPACING HELPERS
+═══════════════════════════════════════════════════════════════ */
+
+.bottom-three   { margin-bottom: 1.5rem; }
+.bottom-one     { margin-bottom: 0.5rem; }
+.bottom-onefive { margin-bottom: 0.75rem; }
+.top-space      { margin-top: 1rem; }

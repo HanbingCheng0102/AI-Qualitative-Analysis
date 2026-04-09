@@ -12,6 +12,8 @@ import { useAtom } from 'jotai';
 import { annotations_findAll, documents_findAll, floors_findAll } from './api/dataFacade';
 import { useEffect } from 'react';
 import FragmentImage from './views/FragmentImage';
+import SurveyIngestionView from './views/SurveyIngestionView';
+import ClusterGraphView from './views/ClusterGraphView';
 
 import { DevTools } from 'jotai-devtools';
 import 'jotai-devtools/styles.css';
@@ -51,13 +53,12 @@ function App() {
   return (
     <>
       <DevTools/>
-      <div className='whole-application'>
-        <div className='component-block'>
+      <div className='app-shell'>
         <BrowserRouter>
           <div className='side-panel'>
             <Sidebar></Sidebar>
           </div>
-            <div>
+          <div className='main-content'>
             <Routes>
               <Route path='/' Component={WorkspaceArea}></Route>
               <Route path='/doc-viewer' Component={DocumentViewer}></Route>
@@ -65,14 +66,12 @@ function App() {
               <Route path='/frag-extract-textual' Component={FragmentExtractorTextual}></Route>
               <Route path='/frag-extract-query' Component={FragmentExtractorQuery}></Route>
               <Route path='/frag-image' Component={FragmentImage}></Route>
+              <Route path='/survey-ingest' Component={SurveyIngestionView}></Route>
+              <Route path='/cluster-graph' Component={ClusterGraphView}></Route>
             </Routes>
-            </div>
+          </div>
         </BrowserRouter>
-            
-        </div>
       </div>
-      
-      
     </>
   )
 }

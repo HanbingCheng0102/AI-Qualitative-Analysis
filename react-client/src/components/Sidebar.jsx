@@ -30,6 +30,8 @@ import {
     PlusIcon,
     DocumentDuplicateIcon,
     XCircleIcon,
+    ArrowUpTrayIcon,
+    CircleStackIcon,
   } from "@heroicons/react/24/solid";
 import { useLocation, useNavigate } from "react-router-dom";
 import React, { useEffect, useRef, useState } from "react";
@@ -184,16 +186,20 @@ function Sidebar() {
     
     return (
       <>
-      <Card className="h-[calc(100vh-2rem)] w-full max-w-[20rem] p-3 shadow-xl shadow-blue-gray-600 text-black">
-        <h1 className="block antialiased tracking-normal text-4xl pb-4">Neighbourhood Insight Engine</h1> <br/>
-        <h2 className="block antialiased tracking-normal text-2xl font-semibold pb-0 text-left pl-2">Tools</h2>
+      <Card className="h-full w-full max-w-full rounded-none shadow-none border-0 p-0 text-black overflow-y-auto">
+        <div className="px-4 pt-4 pb-2 border-b border-slate-100">
+          <h1 className="text-base font-bold tracking-tight text-slate-800 leading-snug">Neighbourhood Insight Engine</h1>
+        </div>
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tools</p>
+        </div>
         <List>         
           <ListItem onClick={() => nav("doc-viewer")}>
             <ListItemPrefix>
               <DocumentIcon className="h-6 w-6" />
             </ListItemPrefix>
             <Typography color="black" className="mr-auto">
-            <h2 className="block antialiased tracking-normal text-xl">Document Viewer</h2>
+            <h2 className="block antialiased tracking-normal text-sm">Document Viewer</h2>
             </Typography>
           </ListItem>
 
@@ -202,11 +208,27 @@ function Sidebar() {
               <PuzzlePieceIcon className="h-6 w-6" />
             </ListItemPrefix>
             <Typography color="black" className="mr-auto">
-            <h2 className="block antialiased tracking-normal text-xl">My Fragments</h2>
+            <h2 className="block antialiased tracking-normal text-sm">My Fragments</h2>
             </Typography>
           </ListItem>
 
+          <ListItem onClick={() => nav("survey-ingest")}>
+            <ListItemPrefix>
+              <ArrowUpTrayIcon className="h-6 w-6" />
+            </ListItemPrefix>
+            <Typography color="black" className="mr-auto">
+            <h2 className="block antialiased tracking-normal text-sm">Survey Ingestion</h2>
+            </Typography>
+          </ListItem>
 
+          <ListItem onClick={() => nav("cluster-graph")}>
+            <ListItemPrefix>
+              <CircleStackIcon className="h-6 w-6" />
+            </ListItemPrefix>
+            <Typography color="black" className="mr-auto">
+            <h2 className="block antialiased tracking-normal text-sm">Cluster Graph</h2>
+            </Typography>
+          </ListItem>
 
           {/* FRAGMENT EXTRACTORS */}
           <Accordion
@@ -224,7 +246,7 @@ function Sidebar() {
                 <SquaresPlusIcon className="h-6 w-6" />
               </ListItemPrefix>
               <Typography color="black" className="mr-auto">
-              <h2 className="block antialiased tracking-normal text-xl">Fragment Extractors</h2>
+              <h2 className="block antialiased tracking-normal text-sm">Fragment Extractors</h2>
               </Typography>
             </AccordionHeader>
           </ListItem>
@@ -254,7 +276,9 @@ function Sidebar() {
 
         </List>
 
-        <h2 className="block antialiased tracking-normal text-2xl font-semibold pt-10 pb-3 text-left pl-2">Workspaces</h2>
+        <div className="px-4 pt-4 pb-1 border-t border-slate-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Workspaces</p>
+        </div>
         <List className="gap-4">
 
 
@@ -266,7 +290,7 @@ function Sidebar() {
                 <RectangleGroupIcon className="h-6 w-6" /> : <DocumentDuplicateIcon className="h-6 w-6"></DocumentDuplicateIcon>}
               </ListItemPrefix>
               <Typography color="black" className="mr-auto">
-              <h2 className="block antialiased tracking-normal text-xl">{item.name}</h2>
+              <h2 className="block antialiased tracking-normal text-sm">{item.name}</h2>
               </Typography>
               <XCircleIcon className="hidden group-hover:block relative left-3 h-7 w-7" onClick={() => closeTab(item.index)}></XCircleIcon>
             </ListItem>
@@ -280,13 +304,13 @@ function Sidebar() {
               <PlusIcon className="h-6 w-6" />
             </ListItemPrefix>
             <Typography color="black" className="mr-auto">
-            <h2 className="block antialiased tracking-normal text-xl">Open New Workspace</h2>
+            <h2 className="block antialiased tracking-normal text-sm">Open New Workspace</h2>
             </Typography>
         </ListItem>
 
         <Dialog open={openNewWorkspace} handler={handleNewWorkspaceDialog} size="sm">
           <DialogHeader>
-            <h1 className="text-3xl">What would you like to open?</h1>
+            <h1 className="text-lg font-semibold">What would you like to open?</h1>
             </DialogHeader>
           <DialogBody>
           <div className="component-block-dia relative left-14 !gap-32">
@@ -296,7 +320,7 @@ function Sidebar() {
                 <CardBody>
                     <div className="component-block-vert-small">
                     <Typography color="white">
-                    <h2 className="block antialiased tracking-normal text-2xl font-bold text-center ">New Virtual Floor</h2>
+                    <h2 className="block antialiased tracking-normal text-base font-bold text-center">New Virtual Floor</h2>
                     </Typography>
                     <div className="component-block-annot">
                     <PlusIcon className="h-12 w-12 relative pt-4 left-12 bottom-10 fill-white"></PlusIcon>
@@ -311,7 +335,7 @@ function Sidebar() {
                 <CardBody>
                     <div className="component-block-vert-small">
                     <Typography color="black">
-                    <h2 className="block antialiased tracking-normal text-2xl font-bold text-center ">Load Existing Floor</h2>
+                    <h2 className="block antialiased tracking-normal text-base font-bold text-center">Load Existing Floor</h2>
                     </Typography>
                     <RectangleGroupIcon className="h-14 w-14 relative left-20 bottom-10 "></RectangleGroupIcon>
                     </div>
@@ -323,7 +347,7 @@ function Sidebar() {
               <CardBody>
                 <div className="component-block-vert-small relative top-16">
                 <Typography color="white">
-                <h2 className="block antialiased tracking-normal text-2xl font-bold text-center ">Document View</h2>
+                <h2 className="block antialiased tracking-normal text-base font-bold text-center">Document View</h2>
                 </Typography>
                 <DocumentDuplicateIcon className="h-16 w-16 relative left-16 bottom-8 fill-white"></DocumentDuplicateIcon>
                 </div>
@@ -339,7 +363,7 @@ function Sidebar() {
               variant="text"
               color="red"
               onClick={handleNewWorkspaceDialog}
-              className="mr-1 text-lg"
+              className="mr-1 text-sm"
             >
               <span>Cancel</span>
             </Button>
@@ -349,7 +373,7 @@ function Sidebar() {
 
         <Dialog open={openLoad} handler={handleLoadDialog} size="sm" className="!text-black">
           <DialogHeader>
-            <h1 className="text-3xl">Which Virtual Floor would you like to load?</h1>
+            <h1 className="text-lg font-semibold">Which Virtual Floor would you like to load?</h1>
             </DialogHeader>
           <DialogBody className="!text-black">
           <ItemList itemList={virtualFloorList} setItemList={setVirtualFloorList} onDoubleClick={chooseSavedFloor} name={"Available Virtual Floors"}></ItemList>
@@ -362,7 +386,7 @@ function Sidebar() {
               variant="text"
               color="red"
               onClick={handleLoadDialog}
-              className="mr-1 text-lg"
+              className="mr-1 text-sm"
             >
               <span>Cancel</span>
             </Button>

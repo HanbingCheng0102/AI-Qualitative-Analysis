@@ -25,10 +25,10 @@ function FragmentEditorPanel({selectedFragment}){
 
     return (
         <>
-        <div className="fragment-editor-location">
-        <Card className="w-[700px] h-5/6">
+        <div className="w-80 flex-shrink-0 overflow-y-auto">
+        <Card className="w-full h-full">
         <CardBody>
-            <h1 className="mb-4 pb-4 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-2xl lg:text-3xl dark:text-white">Selected Fragment</h1>
+            <h1 className="mb-4 pb-4 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-base lg:text-base dark:text-white">Selected Fragment</h1>
             <div className="pl-2 pb-6 text-left text-black">
                 <b>{selectedFragment.name}</b> <br/>
                 <small><b>ID: </b> {selectedFragment._id.toString()}</small> <br/>
@@ -38,7 +38,7 @@ function FragmentEditorPanel({selectedFragment}){
                 <div className="html-content-view !max-h-80 " dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedFragment.html) }} /> 
             </div>
 
-            <h2 className="mb-4 pt-8 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-2xl lg:text-2xl dark:text-white">Annotations</h2>
+            <h2 className="mb-4 pt-8 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-sm lg:text-sm dark:text-white">Annotations</h2>
             <div className="h-40 overflow-y-auto overflow-x-hidden">
                 {matchingAnnotsList.length > 0 ? 
                     matchingAnnotsList.map((item, index) => (
@@ -54,7 +54,7 @@ function FragmentEditorPanel({selectedFragment}){
             </div>
             
 
-            <h2 className="mb-4 pt-8 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-2xl lg:text-2xl dark:text-white">Editor goes here</h2>
+            <h2 className="mb-4 pt-8 text-xl font-bold leading-none tracking-tight text-gray-900 md:text-sm lg:text-sm dark:text-white">Editor goes here</h2>
             
         </CardBody>
         </Card>
