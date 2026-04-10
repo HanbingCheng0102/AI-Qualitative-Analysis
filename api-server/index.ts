@@ -1,8 +1,13 @@
 
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 
 import { DriverFactory } from "./drivers/driverFactory.ts";
 import StorageDriver from "./drivers/storageDriver.ts";
+import MongoDriver from "./drivers/mongoDriver.ts";
+import WorkspaceRepository from "./repositories/workspaceRepository.ts";
+import WorkspaceService from "./services/workspaceService.ts";
+import FloorRepository from "./repositories/floorRepository.ts";
+import FloorService from "./services/floorService.ts";
 
 import env from "dotenv";
 import { resolve, dirname } from "path";
@@ -10,9 +15,16 @@ import { fileURLToPath } from "url";
 
 // Walk up to find the root .env (shared with ai-service)
 const __dirname = dirname(fileURLToPath(import.meta.url));
-env.config({ path: resolve(__dirname, "../../.env") });
+env.config({ path: resolve(__dirname, "../.env") });
 env.config(); // also load local .env if present, without overriding
 
+function asyncRoute(
+    handler: (req: Request, res: Response, next: NextFunction) => Promise<void>
+) {
+    return (req: Request, res: Response, next: NextFunction) => {
+        handler(req, res, next).catch(next);
+    };
+}
 
 async function main() {
 
@@ -28,7 +40,7 @@ async function main() {
     // Create the storage driver
     const driver = DriverFactory.createDriver("mongo", {
         connectionString: uri
-    });
+    }) as MongoDriver;
 
     // Check that the connection worked
     if(!await driver.getDb()) 
@@ -50,11 +62,25 @@ async function main() {
     // Log all requests to console
     app.use((req, res, next) => {
         console.log(`Received request: ${req.method} ${req.path}`);
-        const body = JSON.stringify(req.body, null, 2);
-        console.log(body.split('\n').map(line => '  ' + line).join('\n'));
+        const hasBody =
+            req.body !== undefined &&
+            req.body !== null &&
+            (!(typeof req.body === "object") || Object.keys(req.body).length > 0);
+
+        if (hasBody) {
+            const body = JSON.stringify(req.body, null, 2);
+            console.log(body.split('\n').map(line => '  ' + line).join('\n'));
+        }
         next();
     });
 
+
+
+    const workspaceRepository = new WorkspaceRepository(() => driver.getDb());
+    const workspaceService = new WorkspaceService(workspaceRepository);
+
+    const floorRepository = new FloorRepository(() => driver.getDb());
+    const floorService = new FloorService(floorRepository);
 
 
     // Create a wrapper for each method in the driver to be called via RPC
@@ -73,6 +99,46 @@ async function main() {
 
 
 
+    app.get("/api/health", asyncRoute(async (_req, res) => {
+        res.json({ ok: true });
+    }));
+
+    app.get("/api/bootstrap", asyncRoute(async (_req, res) => {
+        const [documents, annotations, floors] = await Promise.all([
+            driver.getAllDocuments(),
+            driver.getAllAnnotations(),
+            floorService.findAll()
+        ]);
+
+        res.json({ documents, annotations, floors });
+    }));
+
+    app.get("/api/workspace/session", asyncRoute(async (_req, res) => {
+        const session = await workspaceService.getWorkspaceSession();
+        res.json(session);
+    }));
+
+    app.put("/api/workspace/session", asyncRoute(async (req, res) => {
+        const session = await workspaceService.saveWorkspaceSession(req.body);
+        res.json(session);
+    }));
+
+    app.get("/api/floors", asyncRoute(async (_req, res) => {
+        const floors = await floorService.findAll();
+        res.json(floors);
+    }));
+
+    app.post("/api/floors", asyncRoute(async (req, res) => {
+        const floor = await floorService.create(req.body);
+        res.status(201).json(floor);
+    }));
+
+    app.put("/api/floors/:id", asyncRoute(async (req, res) => {
+        const floor = await floorService.update(req.params.id, req.body);
+        res.json(floor);
+    }));
+
+
     // Expose the RPC endpoint, which takes a method name and parameters, calls the corresponding handler, and returns the result
     app.post("/rpc", async (req, res) => {
 
@@ -86,6 +152,11 @@ async function main() {
 
         const out = await handlers[method](...args);
         res.json({ result: out });
+    });
+
+    app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
+        console.error(error);
+        res.status(500).json({ error: error.message || "Internal server error" });
     });
 
     const PORT = process.env.PORT || 3000;

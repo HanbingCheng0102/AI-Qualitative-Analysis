@@ -8,6 +8,7 @@ import { Button, Card, CardBody, CardHeader, Dialog, DialogBody, DialogFooter, D
 import AnnotationCreator from '../components/AnnotationCreator'
 import { floor_save, floor_update } from '../api/dataFacade'
 import { deleteIconSrc } from '../icons'
+import { sanitizeFloorPayload } from '../stateSerialization'
 
 function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_initial=null}){
 
@@ -199,7 +200,7 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
 
         const newVFObj = {
             _id: id,
-            floor : floorObj,
+            floor : sanitizeFloorPayload(floorObj, saveName).floor,
             name: saveName
         }
 
@@ -218,7 +219,7 @@ function VirtualFloor({tab_index, changeTabName, savedName_initial, savedID_init
 
         const newVFObj = {
             _id: savedIDState,
-            floor : floorObj,
+            floor : sanitizeFloorPayload(floorObj, saveName).floor,
             name: saveName
         }
 

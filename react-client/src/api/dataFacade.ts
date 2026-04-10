@@ -1,6 +1,8 @@
 import { extractAllInterviewDialogueSections, extractAllSurveyQuestions, extractAllTextualFragments, HTMLByAttribute, HTMLByAttributeValue, HTMLByTag, HTMLByTagValueContains } from './fragment.js';
 
-import { parse, stringify } from 'flatted';
+import { stringify } from 'flatted';
+import { createFloor, getBootstrapData, getFloors, updateFloor } from './workspaceClient';
+import { normalizeFloorRecord, sanitizeFloorPayload } from '../stateSerialization';
 
 // We have contrived the RPC API to mirror the StorageDriver interface, so we can use 
 // it as a type here for better type safety and autocompletion when calling storage methods.
@@ -601,11 +603,8 @@ function prepareFloorObject(floor_object, name) {
  * @return {ObjectId} insertedID 
  */
 export async function floor_save(floor_object, name) {
-
-    const realmObj = prepareFloorObject(floor_object, name)
-    const id = await storage.addNewItem('virtualFloors', realmObj)
-
-    return id
+    const savedFloor = await createFloor(sanitizeFloorPayload(floor_object, name))
+    return savedFloor._id
 }
 
 /**
@@ -618,11 +617,8 @@ export async function floor_save(floor_object, name) {
  * @return {ObjectId} insertedID 
  */
 export async function floor_update(floor_object, floor_id, name) {
-
-    const realmObj = prepareFloorObject(floor_object, name)
-    const id = await storage.updateItem('virtualFloors', floor_id, realmObj)
-
-    return id
+    await updateFloor(floor_id, sanitizeFloorPayload(floor_object, name))
+    return floor_id
 }
 
 /**
@@ -669,15 +665,17 @@ export async function fragments_findAll() {
  * @return {Array<object>} 
  */
 export async function floors_findAll() {
-    const vfs = await storage.getAllFloors()
+    const vfs = await getFloors()
+    return vfs.map(normalizeFloorRecord)
+}
 
-    //undo flatten serialisation
-    for (const vf of vfs) {
-        let flat_floor = parse(vf.floor)
-        vf.floor = flat_floor
+export async function bootstrap_findAll() {
+    const bootstrap = await getBootstrapData()
+    return {
+        documents: bootstrap.documents ?? [],
+        annotations: bootstrap.annotations ?? [],
+        floors: (bootstrap.floors ?? []).map(normalizeFloorRecord)
     }
-
-    return vfs
 }
 
 /**

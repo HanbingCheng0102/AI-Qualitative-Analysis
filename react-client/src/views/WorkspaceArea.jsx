@@ -3,7 +3,6 @@ import { useAtom } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { a2c_atom, currentTab_atom, f2c_atom, openTabs_atom, openTabsCount_atom, recentlyDeletedIndex_atom, vfTabReady_atom, virtualFloors } from "../state"
 import VirtualFloor from "./VirtualFloor"
-import { RESET } from "jotai/utils"
 
 function Home(){
 
@@ -138,8 +137,8 @@ function Home(){
         }else{
             if (openTabsCount == 1){
                 console.log("RESETTING ALL A2C AND F2C")
-                seta2c(RESET)
-                setf2c(RESET)
+                seta2c([])
+                setf2c([])
                 setOpenTabsCount(0)
             }
             
