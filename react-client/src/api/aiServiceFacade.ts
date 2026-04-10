@@ -107,6 +107,36 @@ export async function pipeline_getFeedbackCount(docId: string) {
 }
 
 /**
+ * Suggest which manual group a queued fragment belongs to.
+ * Called after >= 20 fragments have been placed on the manual canvas.
+ * groups = current proximity groups: [{ group_id, fragment_ids }]
+ */
+export async function pipeline_suggestManualPlacement(
+    docId: string,
+    fragmentId: string,
+    groups: { group_id: string; fragment_ids: string[] }[]
+) {
+    return post("/suggest/placement", { doc_id: docId, fragment_id: fragmentId, groups }) as Promise<{
+        suggestion: { group_id: string | null; confidence: number; new_cluster: boolean } | null;
+    }>;
+}
+
+/**
+ * Persist manual proximity groups as labelled cluster documents.
+ * groups = array of { fragment_ids: string[] }
+ * Returns { cluster_ids, labelled }
+ */
+export async function pipeline_saveManualClusters(
+    docId: string,
+    groups: { fragment_ids: string[] }[]
+) {
+    return post("/suggest/save", { doc_id: docId, groups }) as Promise<{
+        cluster_ids: string[];
+        labelled: { cluster_id: string; label: string }[];
+    }>;
+}
+
+/**
  * Get AI-suggested cluster placements for uncategorised fragments.
  * Should only be called after >= 20 manual placements.
  * Returns { suggestions: [...] }

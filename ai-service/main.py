@@ -6,7 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 # when running from ai-service/ or any subdirectory
 load_dotenv(find_dotenv())
 
-from routers import ingest, embed, cluster, label, feedback
+from routers import ingest, embed, cluster, label, feedback, suggest
 
 app = FastAPI(title="NIE AI Service", version="0.1.0")
 
@@ -23,6 +23,7 @@ app.include_router(embed.router, prefix="/embed", tags=["embed"])
 app.include_router(cluster.router, prefix="/cluster", tags=["cluster"])
 app.include_router(label.router, prefix="/label", tags=["label"])
 app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+app.include_router(suggest.router, prefix="/suggest", tags=["suggest"])
 
 
 @app.get("/health")

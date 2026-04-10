@@ -11,11 +11,16 @@ import {
 import { documents_findAll, survey_delete } from "../api/dataFacade";
 
 // ── Step definitions ──────────────────────────────────────────────────────────
-const STEPS = [
+const AUTO_STEPS = [
     { id: "ingest",   label: "Parsing & PII Redaction",   desc: "Reading the CSV/XLSX and anonymising personal data" },
     { id: "embed",    label: "Embedding Responses",        desc: "Converting text to semantic vectors" },
     { id: "cluster",  label: "Discovering Clusters",       desc: "Running UMAP + HDBSCAN to group similar responses" },
     { id: "label",    label: "Labelling Clusters",         desc: "Asking Claude to name each theme" },
+];
+
+const MANUAL_STEPS = [
+    { id: "ingest",   label: "Parsing & PII Redaction",   desc: "Reading the CSV/XLSX and anonymising personal data" },
+    { id: "embed",    label: "Embedding Responses",        desc: "Converting text to semantic vectors" },
 ];
 
 const STATUS = { idle: "idle", running: "running", done: "done", error: "error" };
@@ -53,6 +58,7 @@ export default function SurveyIngestionView() {
 
     const [file, setFile] = useState(null);
     const [surveyName, setSurveyName] = useState("");
+    const [mode, setMode] = useState("auto"); // "auto" | "manual"
     const [minClusterSize, setMinClusterSize] = useState(5);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState(null);
@@ -116,6 +122,8 @@ export default function SurveyIngestionView() {
         setStepStatus({ ingest: STATUS.idle, embed: STATUS.idle, cluster: STATUS.idle, label: STATUS.idle });
         setStepDetail({});
 
+        const allSteps = mode === "auto" ? AUTO_STEPS : MANUAL_STEPS;
+
         try {
             // Step 1 — Ingest
             setStep("ingest", STATUS.running);
@@ -127,7 +135,13 @@ export default function SurveyIngestionView() {
             const embedRes = await pipeline_embedFragments(ingestRes.doc_id);
             setStep("embed", STATUS.done, `${embedRes.embedded_count} responses embedded`);
 
-            // Step 3 — Cluster
+            if (mode === "manual") {
+                setRunStatus("done");
+                navigate("/manual-placement", { state: { doc_id: ingestRes.doc_id, survey_name: surveyName.trim() } });
+                return;
+            }
+
+            // Step 3 — Cluster (auto only)
             setStep("cluster", STATUS.running);
             const clusterRes = await pipeline_runClustering(ingestRes.doc_id, minClusterSize);
             setStep(
@@ -136,7 +150,7 @@ export default function SurveyIngestionView() {
                 `${clusterRes.cluster_count} clusters found, ${clusterRes.noise_count} uncategorised`
             );
 
-            // Step 4 — Label
+            // Step 4 — Label (auto only)
             setStep("label", STATUS.running);
             const labelRes = await pipeline_labelClusters(clusterRes.cluster_ids);
             setStep("label", STATUS.done, `${labelRes.labelled.length} clusters labelled`);
@@ -145,8 +159,7 @@ export default function SurveyIngestionView() {
             setRunStatus("done");
 
         } catch (err) {
-            // Mark the currently-running step as errored
-            const currentStep = STEPS.find(s => stepStatus[s.id] === STATUS.running);
+            const currentStep = allSteps.find(s => stepStatus[s.id] === STATUS.running);
             if (currentStep) setStep(currentStep.id, STATUS.error, err.message);
             setError(err.message);
             setRunStatus("error");
@@ -194,19 +207,47 @@ export default function SurveyIngestionView() {
                     />
                 </div>
 
+                {/* ── Mode selector ── */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Minimum cluster size <span className="text-gray-400 font-normal">(smaller = more clusters)</span>
-                    </label>
-                    <input
-                        type="number"
-                        value={minClusterSize}
-                        min={2}
-                        max={50}
-                        onChange={e => setMinClusterSize(Number(e.target.value))}
-                        className="w-24 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Clustering mode</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        {[
+                            { value: "auto",   title: "Auto",   desc: "AI clusters everything for you (UMAP + HDBSCAN + LLM labels)" },
+                            { value: "manual", title: "Manual", desc: "You place responses on a whiteboard; clusters form by proximity" },
+                        ].map(opt => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setMode(opt.value)}
+                                className={`text-left p-3 rounded-lg border-2 transition-colors
+                                    ${mode === opt.value
+                                        ? "border-blue-500 bg-blue-50"
+                                        : "border-gray-200 bg-white hover:border-gray-300"}`}
+                            >
+                                <p className={`text-sm font-semibold ${mode === opt.value ? "text-blue-700" : "text-gray-800"}`}>
+                                    {opt.title}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5 leading-snug">{opt.desc}</p>
+                            </button>
+                        ))}
+                    </div>
                 </div>
+
+                {mode === "auto" && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Minimum cluster size <span className="text-gray-400 font-normal">(smaller = more clusters)</span>
+                        </label>
+                        <input
+                            type="number"
+                            value={minClusterSize}
+                            min={2}
+                            max={50}
+                            onChange={e => setMinClusterSize(Number(e.target.value))}
+                            className="w-24 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* ── Run button ── */}
@@ -222,7 +263,7 @@ export default function SurveyIngestionView() {
 
             {/* ── Pipeline steps ── */}
             <div className="space-y-3 mb-6">
-                {STEPS.map(step => (
+                {(mode === "auto" ? AUTO_STEPS : MANUAL_STEPS).map(step => (
                     <StepRow
                         key={step.id}
                         step={step}

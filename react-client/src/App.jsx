@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import FragmentImage from './views/FragmentImage';
 import SurveyIngestionView from './views/SurveyIngestionView';
 import ClusterGraphView from './views/ClusterGraphView';
+import ManualPlacementView from './views/ManualPlacementView';
 
 import { DevTools } from 'jotai-devtools';
 import 'jotai-devtools/styles.css';
@@ -68,6 +69,7 @@ function App() {
               <Route path='/frag-image' Component={FragmentImage}></Route>
               <Route path='/survey-ingest' Component={SurveyIngestionView}></Route>
               <Route path='/cluster-graph' Component={ClusterGraphView}></Route>
+              <Route path='/manual-placement' Component={ManualPlacementView}></Route>
             </Routes>
           </div>
         </BrowserRouter>

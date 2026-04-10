@@ -762,3 +762,8 @@ export async function cluster_saveNote(clusterId: string, note: string) {
 export async function survey_delete(docId: string) {
     return await storage.deleteSurveyDataset(docId);
 }
+
+/** Fetch all fragments belonging to a specific document (raw array). */
+export async function fragments_findByDoc(docId: string): Promise<any[]> {
+    return await storage.getAllFragments_fromSpecificDoc(docId);
+}
