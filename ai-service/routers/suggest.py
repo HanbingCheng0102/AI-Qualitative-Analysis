@@ -10,7 +10,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services import labeller
+from services import labeller, llm_clusterer
 from services.mongo_client import get_db
 
 router = APIRouter()
@@ -107,6 +107,222 @@ def suggest_placement(req: PlacementRequest):
             "new_cluster": True,
         }
     }
+
+
+# ── LLM-based placement suggestion ───────────────────────────────────────────
+
+class LLMPlacementRequest(BaseModel):
+    doc_id: str
+    fragment_id: str
+    groups: List[GroupSpec]
+    research_question: str = ""
+
+
+@router.post("/llm-placement")
+def suggest_llm_placement(req: LLMPlacementRequest):
+    """
+    Like /suggest/placement but uses the LLM instead of cosine similarity.
+    For each group, fetches up to 4 sample texts so the LLM can read them
+    directly and judge semantic fit — no embeddings involved.
+    Only called after >= 20 fragments have been placed (enforced by frontend).
+    """
+    db = get_db()
+
+    try:
+        frag_oid = ObjectId(req.fragment_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid fragment_id")
+
+    frag = db["fragments"].find_one({"_id": frag_oid}, {"redacted_text": 1})
+    if not frag or not frag.get("redacted_text"):
+        return {"suggestion": None, "reason": "no text"}
+
+    frag_text = frag["redacted_text"]
+
+    # Build a list of groups with sample texts for the LLM prompt
+    group_samples: list[dict] = []
+    for group in req.groups:
+        if not group.fragment_ids:
+            continue
+        try:
+            oids = [ObjectId(fid) for fid in group.fragment_ids]
+        except Exception:
+            continue
+
+        samples = list(db["fragments"].find(
+            {"_id": {"$in": oids}, "redacted_text": {"$ne": None}},
+            {"redacted_text": 1},
+            limit=4,
+        ))
+        if not samples:
+            continue
+
+        group_samples.append({
+            "group_id": group.group_id,
+            "texts": [s["redacted_text"] for s in samples],
+            "total": len(group.fragment_ids),
+        })
+
+    if not group_samples:
+        return {"suggestion": {"group_id": None, "confidence": 0.0, "new_cluster": True}}
+
+    # Build the prompt
+    rq_line = f"Research focus: {req.research_question}\n\n" if req.research_question.strip() else ""
+
+    groups_text = ""
+    for g in group_samples:
+        bullet_texts = "\n".join(f'    - "{t}"' for t in g["texts"])
+        extra = f" (+ {g['total'] - len(g['texts'])} more)" if g["total"] > len(g["texts"]) else ""
+        groups_text += f"Group {g['group_id']} ({g['total']} responses{extra}):\n{bullet_texts}\n\n"
+
+    prompt = f"""{rq_line}You are helping a researcher sort survey responses into groups on a whiteboard.
+
+Current groups and their sample responses:
+{groups_text}New response to place:
+\"\"\"{frag_text}\"\"\"
+
+Decide which group this response fits best, or whether it needs a new group.
+- Assign to an existing group if the response clearly shares the same theme as its samples.
+- Suggest a new group only if the response is genuinely different from all existing groups.
+
+Reply with JSON only — no markdown, no explanation.
+To assign to a group:  {{"action": "assign", "group_id": "<group id string>", "confidence": <0.0-1.0>}}
+To create a new group: {{"action": "new", "confidence": <0.0-1.0>}}"""
+
+    try:
+        raw = llm_clusterer._call_llm(prompt)
+        result = llm_clusterer._parse_json(raw)
+        confidence = float(result.get("confidence", 0.5))
+
+        if result.get("action") == "assign":
+            gid = str(result.get("group_id", ""))
+            # Validate it's actually one of our groups
+            valid_ids = {g["group_id"] for g in group_samples}
+            if gid in valid_ids:
+                return {"suggestion": {"group_id": gid, "confidence": confidence, "new_cluster": False}}
+
+        # "new" or unrecognised group_id — suggest new cluster
+        return {"suggestion": {"group_id": None, "confidence": confidence, "new_cluster": True}}
+
+    except Exception:
+        return {"suggestion": None, "reason": "llm_error"}
+
+
+# ── Sanity check ─────────────────────────────────────────────────────────────
+
+class SanityCheckRequest(BaseModel):
+    doc_id: str
+    fragment_id: str
+    placed_in_group_id: str
+    groups: List[GroupSpec]
+    research_question: str = ""
+
+
+@router.post("/sanity-check")
+def sanity_check(req: SanityCheckRequest):
+    """
+    After a user places a fragment, check whether the placement makes sense.
+    Uses the LLM to read sample texts from each group and judge fit.
+    Returns {"ok": true} if the placement is reasonable, or
+    {"ok": false, "suggested_group_id": "X", "reason": "..."} if a better
+    group clearly exists.
+    """
+    db = get_db()
+
+    try:
+        frag_oid = ObjectId(req.fragment_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid fragment_id")
+
+    frag = db["fragments"].find_one({"_id": frag_oid}, {"redacted_text": 1})
+    if not frag or not frag.get("redacted_text"):
+        return {"ok": True}
+
+    frag_text = frag["redacted_text"]
+
+    # Fetch up to 3 sample texts per group (excluding the fragment itself)
+    group_samples: list[dict] = []
+    for group in req.groups:
+        try:
+            oids = [ObjectId(fid) for fid in group.fragment_ids if fid != req.fragment_id]
+        except Exception:
+            continue
+        if not oids:
+            continue
+        samples = list(db["fragments"].find(
+            {"_id": {"$in": oids}, "redacted_text": {"$ne": None}},
+            {"redacted_text": 1},
+            limit=3,
+        ))
+        group_samples.append({
+            "group_id": group.group_id,
+            "texts": [s["redacted_text"] for s in samples],
+            "is_placed": group.group_id == req.placed_in_group_id,
+        })
+
+    # Need at least the placed group + one other with samples to compare
+    other_groups = [g for g in group_samples if not g["is_placed"] and g["texts"]]
+    if not other_groups:
+        return {"ok": True}
+
+    placed_group = next((g for g in group_samples if g["is_placed"]), None)
+
+    # Build prompt
+    rq_line = f"Research focus: {req.research_question}\n\n" if req.research_question.strip() else ""
+
+    if placed_group and placed_group["texts"]:
+        placed_bullets = "\n".join(f'    - "{t}"' for t in placed_group["texts"])
+        placed_section = f"Group {req.placed_in_group_id} — where the user placed it:\n{placed_bullets}\n\n"
+    else:
+        placed_section = f"Group {req.placed_in_group_id} — where the user placed it (no other members yet).\n\n"
+
+    other_section = ""
+    for g in other_groups:
+        bullets = "\n".join(f'    - "{t}"' for t in g["texts"])
+        other_section += f"Group {g['group_id']}:\n{bullets}\n\n"
+
+    prompt = f"""{rq_line}You are reviewing a researcher's placement of a survey response on a clustering whiteboard.
+
+{placed_section}Other groups:
+{other_section}Response being reviewed:
+\"\"\"{frag_text}\"\"\"
+
+The researcher placed this response in Group {req.placed_in_group_id}.
+
+Your default answer is {{"ok": true}}. Only override this if the placement is an obvious, clear-cut mistake — meaning the response has essentially nothing in common with the group it was placed in, AND it unambiguously belongs in one of the other groups instead.
+
+Do NOT flag:
+- Borderline cases or minor differences in tone
+- Responses that loosely fit multiple groups
+- Placements that are reasonable even if not perfect
+- Cases where you are uncertain
+
+ONLY flag when you are highly confident the placement is wrong AND a specific other group is a far better match.
+
+Reply with JSON only — no markdown, no explanation.
+{{"ok": true}} — placement is fine (use this in most cases)
+{{"ok": false, "suggested_group_id": "<id>", "reason": "<one concise sentence>"}} — only if placement is clearly wrong"""
+
+    try:
+        raw = llm_clusterer._call_llm(prompt)
+        result = llm_clusterer._parse_json(raw)
+
+        if result.get("ok") is not False:
+            return {"ok": True}
+
+        suggested = str(result.get("suggested_group_id", ""))
+        valid_ids = {g["group_id"] for g in group_samples}
+
+        if suggested not in valid_ids or suggested == req.placed_in_group_id:
+            return {"ok": True}
+
+        return {
+            "ok": False,
+            "suggested_group_id": suggested,
+            "reason": result.get("reason", "This response may fit better in another group."),
+        }
+    except Exception:
+        return {"ok": True}  # fail open — never block the user
 
 
 # ── Save manual clusters ──────────────────────────────────────────────────────

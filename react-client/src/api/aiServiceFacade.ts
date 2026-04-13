@@ -107,7 +107,7 @@ export async function pipeline_getFeedbackCount(docId: string) {
 }
 
 /**
- * Suggest which manual group a queued fragment belongs to.
+ * Suggest which manual group a queued fragment belongs to (cosine similarity).
  * Called after >= 20 fragments have been placed on the manual canvas.
  * groups = current proximity groups: [{ group_id, fragment_ids }]
  */
@@ -117,6 +117,27 @@ export async function pipeline_suggestManualPlacement(
     groups: { group_id: string; fragment_ids: string[] }[]
 ) {
     return post("/suggest/placement", { doc_id: docId, fragment_id: fragmentId, groups }) as Promise<{
+        suggestion: { group_id: string | null; confidence: number; new_cluster: boolean } | null;
+    }>;
+}
+
+/**
+ * Suggest which manual group a queued fragment belongs to (LLM-based).
+ * Uses the LLM to read sample texts from each group and judge semantic fit
+ * rather than cosine similarity. Accepts an optional research question.
+ */
+export async function pipeline_suggestLLMManualPlacement(
+    docId: string,
+    fragmentId: string,
+    groups: { group_id: string; fragment_ids: string[] }[],
+    researchQuestion = "",
+) {
+    return post("/suggest/llm-placement", {
+        doc_id: docId,
+        fragment_id: fragmentId,
+        groups,
+        research_question: researchQuestion,
+    }) as Promise<{
         suggestion: { group_id: string | null; confidence: number; new_cluster: boolean } | null;
     }>;
 }
@@ -153,4 +174,82 @@ export async function pipeline_suggestPlacements(docId: string) {
             confidence: number;
         }[];
     }>;
+}
+
+/**
+ * Sanity-check a fragment placement: did the user put it in the right group?
+ * Returns { ok: true } if the placement is fine, or
+ * { ok: false, suggested_group_id: string, reason: string } if a better group exists.
+ */
+export async function pipeline_sanityCheck(
+    docId: string,
+    fragmentId: string,
+    placedInGroupId: string,
+    groups: { group_id: string; fragment_ids: string[] }[],
+    researchQuestion = "",
+) {
+    return post("/suggest/sanity-check", {
+        doc_id: docId,
+        fragment_id: fragmentId,
+        placed_in_group_id: placedInGroupId,
+        groups,
+        research_question: researchQuestion,
+    }) as Promise<
+        | { ok: true }
+        | { ok: false; suggested_group_id: string; reason: string }
+    >;
+}
+
+export type LLMClusterEvent =
+    | { event: "filter"; fragment_id: string; name: string; kept: boolean }
+    | { event: "assign"; fragment_id: string; name: string; action: "assign" | "new"; cluster_label: string }
+    | { event: "done";   cluster_count: number; fragment_count: number; cluster_ids: string[] }
+    | { event: "error";  detail: string };
+
+/**
+ * Run the LLM-driven semantic clustering pipeline.
+ * Streams NDJSON events; calls onEvent for each one.
+ * Resolves when the stream closes, rejects on network error.
+ */
+export async function pipeline_llmCluster(
+    docId: string,
+    researchQuestion: string,
+    columnFilters: Record<string, string>,
+    onEvent: (e: LLMClusterEvent) => void,
+): Promise<void> {
+    const res = await fetch(`${AI_URI}/llm-cluster/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            doc_id: docId,
+            research_question: researchQuestion,
+            column_filters: columnFilters,
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail ?? `LLM cluster error: ${res.status}`);
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+                onEvent(JSON.parse(trimmed) as LLMClusterEvent);
+            } catch {
+                // malformed line — ignore
+            }
+        }
+    }
 }
