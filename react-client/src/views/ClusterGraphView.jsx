@@ -22,8 +22,11 @@ import { useAtom } from "jotai";
 import { clusters } from "../state";
 import { clusters_findAll, cluster_getFragments, fragment_saveNote, cluster_saveNote } from "../api/dataFacade";
 import {
+    getParticipant,
     pipeline_recordFeedback,
     pipeline_getFeedbackCount,
+    pipeline_getLatestFeedbackState,
+    pipeline_logFeedback,
     pipeline_suggestPlacements,
 } from "../api/aiServiceFacade";
 
@@ -41,6 +44,8 @@ const RESP_GAP_Y = 12;    // vertical gap between response cards
 const CELL_PAD_X = 60;    // horizontal padding between cluster cells
 const CELL_PAD_Y = 80;    // vertical padding between cluster cells
 const PROXIMITY  = 280;   // px — max distance to trigger reassignment
+// Experiment setting: cosine-based suggestion cards are disabled for P1 sessions.
+const SUGGEST_AT = 9999;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout builder — grid of cluster cells
@@ -159,6 +164,45 @@ function stripHtml(html = "") {
     return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function confirmedIdsFromStates(states = []) {
+    return new Set(
+        states
+            .filter(s => s.latest_action === "confirm")
+            .map(s => s.fragment_id)
+    );
+}
+
+function applyConfirmedIdsToNodes(nodeList, confirmedIds, onConfirm) {
+    return nodeList.map(n => {
+        if (n.type !== "responseNode") return n;
+        const data = {
+            ...n.data,
+            isConfirmed: confirmedIds.has(n.id),
+        };
+        if (onConfirm) data.onConfirm = onConfirm;
+        return {
+            ...n,
+            data,
+        };
+    });
+}
+
+function logLocalSuggestionError(action, suggestion, error) {
+    const entry = {
+        action,
+        fragment_id: suggestion?.fragment_id,
+        suggested_cluster_id: suggestion?.suggested_cluster_id,
+        message: error?.message ?? String(error),
+        timestamp: new Date().toISOString(),
+    };
+    console.error("Suggestion provenance logging failed", entry);
+    try {
+        const key = "nieSuggestionProvenanceErrors";
+        const existing = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+        window.localStorage.setItem(key, JSON.stringify([...existing.slice(-49), entry]));
+    } catch (_) {}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom node: Theme
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,19 +311,27 @@ function ResponseNode({ data }) {
 
     return (
         <div
-            className="rounded-lg shadow-sm select-none transition-all"
+            className="relative rounded-lg shadow-sm select-none transition-all"
             style={{
                 width: RESP_W,
                 background: data.isSnapping ? `${data.color}12` : "#fff",
-                border: data.isSnapping
-                    ? `2px solid ${data.color}`
-                    : "1px solid #e2e8f0",
+                border: data.isConfirmed
+                    ? "2px solid #16a34a"
+                    : data.isSnapping
+                        ? `2px solid ${data.color}`
+                        : "1px solid #e2e8f0",
                 borderLeft: `4px solid ${data.color}`,
                 transition: "background 0.15s, border-color 0.15s",
             }}
         >
             <Handle type="target" position={Position.Top}    style={{ opacity: 0 }} />
             <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+
+            {data.isConfirmed && (
+                <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white shadow">
+                    ✓
+                </span>
+            )}
 
             <div
                 className="px-2 pt-2 pb-1 cursor-pointer"
@@ -298,6 +350,22 @@ function ResponseNode({ data }) {
             </div>
 
             <div className="px-2 pb-2">
+                <button
+                    className={`mr-2 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
+                        data.isConfirmed
+                            ? "cursor-not-allowed border-green-200 bg-green-50 text-green-600"
+                            : "border-green-300 text-green-700 hover:bg-green-50"
+                    }`}
+                    disabled={data.isConfirmed}
+                    title={data.isConfirmed ? "Placement confirmed" : "Confirm this placement"}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (!data.isConfirmed) data.onConfirm?.(data.fragId, data.clusterId);
+                    }}
+                >
+                    ✓ Confirm
+                </button>
                 <button
                     className="text-xs text-blue-400 hover:underline"
                     onPointerDown={e => e.stopPropagation()}
@@ -351,7 +419,7 @@ function SuggestionCard({ s, onAccept, onReject }) {
 // Inner — needs ReactFlowProvider context for useReactFlow()
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GraphInner({ docId }) {
+function GraphInner({ docId, participantId }) {
     const { getNodes, fitView } = useReactFlow();
     const [clusterList, setClusterList] = useAtom(clusters);
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -365,6 +433,26 @@ function GraphInner({ docId }) {
     const assignmentRef  = useRef({});
     // last highlighted cluster during drag (to clear it on leave)
     const prevTargetRef  = useRef(null);
+
+    const refreshLatestState = useCallback(async () => {
+        if (!docId) return;
+        const { states } = await pipeline_getLatestFeedbackState(docId);
+        const confirmedIds = confirmedIdsFromStates(states);
+        setNodes(prev => applyConfirmedIdsToNodes(prev, confirmedIds));
+    }, [docId, participantId, setNodes]);
+
+    const confirmFragment = useCallback(async (fragId, clusterId) => {
+        if (!docId || !fragId || !clusterId) return;
+        try {
+            await pipeline_logFeedback(docId, fragId, "confirm", {
+                fromClusterId: clusterId,
+            });
+            await refreshLatestState();
+        } catch (err) {
+            console.error(err);
+            setError(err.message);
+        }
+    }, [docId, participantId, refreshLatestState]);
 
     // ── Load ─────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -388,12 +476,14 @@ function GraphInner({ docId }) {
 
                 assignmentRef.current = assignment;
                 const { nodes: n, edges: e } = buildLayout(cls, fragsByCluster);
-                setNodes(n);
+                const { states } = await pipeline_getLatestFeedbackState(docId);
+                const confirmedIds = confirmedIdsFromStates(states);
+                setNodes(applyConfirmedIdsToNodes(n, confirmedIds, confirmFragment));
                 setEdges(e);
 
                 const { count } = await pipeline_getFeedbackCount(docId);
                 setFeedbackCount(count);
-                if (count >= 20) {
+                if (count >= SUGGEST_AT) {
                     const { suggestions: sg } = await pipeline_suggestPlacements(docId);
                     setSuggestions(sg);
                 }
@@ -403,7 +493,7 @@ function GraphInner({ docId }) {
                 setLoading(false);
             }
         })();
-    }, [docId]);
+    }, [docId, participantId, confirmFragment]);
 
     // ── Live drag: highlight nearest in-range theme ───────────────────────────
     const onNodeDrag = useCallback((_, draggedNode) => {
@@ -508,15 +598,16 @@ function GraphInner({ docId }) {
         // Persist
         pipeline_recordFeedback(fragId, oldClusterId, newClusterId)
             .then(async () => {
+                await refreshLatestState();
                 const { count } = await pipeline_getFeedbackCount(docId);
                 setFeedbackCount(count);
-                if (count >= 20) {
+                if (count >= SUGGEST_AT) {
                     const { suggestions: sg } = await pipeline_suggestPlacements(docId);
                     setSuggestions(sg);
                 }
             })
             .catch(console.error);
-    }, [clusterList, docId, getNodes]);
+    }, [clusterList, docId, getNodes, participantId, refreshLatestState]);
 
     // ── Accept suggestion ─────────────────────────────────────────────────────
     const acceptSuggestion = async (s) => {
@@ -534,13 +625,29 @@ function GraphInner({ docId }) {
         ));
         setSuggestions(prev => prev.filter(x => x.fragment_id !== fragId));
         try {
-            await pipeline_recordFeedback(fragId, oldCid, newCid);
+            await pipeline_recordFeedback(fragId, oldCid, newCid, "", {
+                action: "accept_suggestion",
+                suggestedClusterId: newCid,
+                suggestionScore: s.confidence,
+            });
+            await refreshLatestState();
             const { count } = await pipeline_getFeedbackCount(docId);
             setFeedbackCount(count);
         } catch (err) { console.error(err); }
     };
 
-    const rejectSuggestion = s => setSuggestions(prev => prev.filter(x => x.fragment_id !== s.fragment_id));
+    const rejectSuggestion = async (s) => {
+        try {
+            await pipeline_logFeedback(docId, s.fragment_id, "reject_suggestion", {
+                suggestedClusterId: s.suggested_cluster_id,
+                suggestionScore: s.confidence,
+            });
+        } catch (err) {
+            logLocalSuggestionError("reject_suggestion", s, err);
+        } finally {
+            setSuggestions(prev => prev.filter(x => x.fragment_id !== s.fragment_id));
+        }
+    };
 
     // ── Click theme node: zoom to fit that cluster + its responses ────────────
     const onNodeClick = useCallback((_, clickedNode) => {
@@ -607,12 +714,12 @@ function GraphInner({ docId }) {
             {/* Feedback overlay — bottom right */}
             {nodes.length > 0 && (
                 <div className="absolute bottom-4 right-4 z-20 w-72 space-y-2 pointer-events-auto">
-                    {feedbackCount > 0 && feedbackCount < 20 && (
+                    {feedbackCount > 0 && feedbackCount < SUGGEST_AT && (
                         <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 shadow text-xs">
-                            <p className="text-gray-500 mb-1">{feedbackCount}/20 placements to unlock AI suggestions</p>
+                            <p className="text-gray-500 mb-1">{feedbackCount}/{SUGGEST_AT} placements to unlock AI suggestions</p>
                             <div className="h-1.5 rounded bg-gray-200">
                                 <div className="h-1.5 rounded bg-blue-500 transition-all"
-                                     style={{ width: `${(feedbackCount / 20) * 100}%` }} />
+                                     style={{ width: `${(feedbackCount / SUGGEST_AT) * 100}%` }} />
                             </div>
                         </div>
                     )}
@@ -630,7 +737,7 @@ function GraphInner({ docId }) {
                             </div>
                         </div>
                     )}
-                    {feedbackCount >= 20 && suggestions.length === 0 && (
+                    {feedbackCount >= SUGGEST_AT && suggestions.length === 0 && (
                         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow text-xs text-green-700">
                             ✓ AI has learned from {feedbackCount} placements — no pending suggestions
                         </div>
@@ -651,6 +758,7 @@ export default function ClusterGraphView() {
     const [clusterList] = useAtom(clusters);
     const [inputVal, setInputVal] = useState(location.state?.doc_id ?? "");
     const [docId, setDocId]       = useState(location.state?.doc_id ?? null);
+    const participantId = getParticipant();
 
     const nonNoise = clusterList.filter(c => c.label !== "Uncategorised");
 
@@ -671,6 +779,9 @@ export default function ClusterGraphView() {
                     <div className="px-4 py-3 border-b border-gray-100">
                         <h2 className="text-sm font-bold text-gray-800">Clusters</h2>
                         <p className="text-xs text-gray-400">{nonNoise.length} themes</p>
+                        <p className="mt-2 inline-flex max-w-full rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                            <span className="truncate">Participant: {participantId}</span>
+                        </p>
                     </div>
 
                     <div className="px-3 py-2 border-b border-gray-100">
@@ -714,7 +825,7 @@ export default function ClusterGraphView() {
                 </div>
 
                 <ReactFlowProvider>
-                    <GraphInner docId={docId} />
+                    <GraphInner docId={docId} participantId={participantId} />
                 </ReactFlowProvider>
             </div>
         </>

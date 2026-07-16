@@ -18,6 +18,21 @@ async function post(path: string, body: object) {
     return res.json();
 }
 
+function normalizeParticipantId(participantId?: string | null) {
+    const value = participantId?.trim().toUpperCase();
+    return value || "TEST";
+}
+
+/**
+ * Resolve participant identity from the current tab URL at request time.
+ * Router navigation or a page reload is responsible for re-rendering UI consumers.
+ */
+export function getParticipant() {
+    return normalizeParticipantId(
+        new URLSearchParams(window.location.search).get("participant"),
+    );
+}
+
 /**
  * Upload a CSV/XLSX survey file. Runs PII redaction and writes fragments to MongoDB.
  * Returns { doc_id, fragment_count }
@@ -86,14 +101,73 @@ export async function pipeline_recordFeedback(
     fragmentId: string,
     fromClusterId: string,
     toClusterId: string,
-    userNote = ""
+    userNote = "",
+    options: {
+        action?: "move" | "accept_suggestion";
+        suggestedClusterId?: string;
+        suggestionScore?: number;
+    } = {},
 ) {
     return post("/feedback/recluster", {
         fragment_id: fragmentId,
         from_cluster_id: fromClusterId,
         to_cluster_id: toClusterId,
+        action: options.action ?? "move",
+        participant_id: getParticipant(),
+        suggested_cluster_id: options.suggestedClusterId,
+        suggestion_score: options.suggestionScore,
         user_note: userNote,
     });
+}
+
+/**
+ * Record a non-mutating provenance event.
+ * Mutating actions still go through pipeline_recordFeedback.
+ */
+export async function pipeline_logFeedback(
+    docId: string,
+    fragmentId: string,
+    action: "confirm" | "reject_suggestion",
+    options: {
+        fromClusterId?: string;
+        toClusterId?: string;
+        suggestedClusterId?: string;
+        suggestionScore?: number;
+        userNote?: string;
+    } = {},
+) {
+    return post("/feedback/log", {
+        doc_id: docId,
+        fragment_id: fragmentId,
+        action,
+        participant_id: getParticipant(),
+        from_cluster_id: options.fromClusterId,
+        to_cluster_id: options.toClusterId,
+        suggested_cluster_id: options.suggestedClusterId,
+        suggestion_score: options.suggestionScore,
+        user_note: options.userNote ?? "",
+    });
+}
+
+/**
+ * Get the latest provenance action per fragment for one participant.
+ */
+export async function pipeline_getLatestFeedbackState(docId: string) {
+    const participant = encodeURIComponent(getParticipant());
+    const res = await fetch(`${AI_URI}/feedback/latest-state/${docId}?participant=${participant}`);
+    if (!res.ok) throw new Error(`Feedback state error: ${res.status}`);
+    return res.json() as Promise<{
+        participant_id: string;
+        states: {
+            fragment_id: string;
+            latest_action: string;
+            feedback_id: string;
+            timestamp?: string;
+            from_cluster_id?: string;
+            to_cluster_id?: string;
+            suggested_cluster_id?: string;
+        }[];
+    }>;
 }
 
 /**

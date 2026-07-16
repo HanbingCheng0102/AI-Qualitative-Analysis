@@ -1,5 +1,6 @@
 """
 POST /feedback/recluster   — record a manual re-coding event, re-label affected clusters
+POST /feedback/log         — record a non-mutating provenance event
 GET  /feedback/count/{doc_id} — total manual placements for a survey
 POST /feedback/suggest     — suggest cluster assignments for uncategorised fragments
 """
@@ -20,11 +21,38 @@ class FeedbackRequest(BaseModel):
     fragment_id: str
     from_cluster_id: str
     to_cluster_id: str
+    action: str = "move"
+    participant_id: str | None = "TEST"
+    suggested_cluster_id: str | None = None
+    suggestion_score: float | None = None
     user_note: str = ""
+
+
+class FeedbackLogRequest(BaseModel):
+    doc_id: str
+    fragment_id: str
+    action: str
+    participant_id: str | None = "TEST"
+    from_cluster_id: str | None = None
+    to_cluster_id: str | None = None
+    suggested_cluster_id: str | None = None
+    suggestion_score: float | None = None
+    user_note: str | None = None
 
 
 class SuggestRequest(BaseModel):
     doc_id: str
+
+
+def _object_id(value: str, field_name: str) -> ObjectId:
+    try:
+        return ObjectId(value)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}.")
+
+
+def _participant_id(value: str | None) -> str:
+    return (value or "TEST").strip().upper() or "TEST"
 
 
 def _cosine_sim(a, b) -> float:
@@ -36,6 +64,99 @@ def _cosine_sim(a, b) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
+@router.post("/log")
+def log_feedback(req: FeedbackLogRequest):
+    """
+    Record a non-mutating provenance event.
+
+    This endpoint is deliberately limited to actions that do not change fragment
+    placement. Mutating actions are recorded by /feedback/recluster instead.
+    """
+    action = req.action.strip()
+    if action not in {"confirm", "reject_suggestion"}:
+        raise HTTPException(
+            status_code=422,
+            detail="/feedback/log only accepts confirm or reject_suggestion.",
+        )
+
+    if action == "confirm" and not req.from_cluster_id:
+        raise HTTPException(status_code=422, detail="confirm requires from_cluster_id.")
+
+    if action == "reject_suggestion" and not req.suggested_cluster_id:
+        raise HTTPException(status_code=422, detail="reject_suggestion requires suggested_cluster_id.")
+
+    doc_oid = _object_id(req.doc_id, "doc_id")
+    frag_oid = _object_id(req.fragment_id, "fragment_id")
+
+    record = {
+        "doc_id": doc_oid,
+        "fragment_id": frag_oid,
+        "action": action,
+        "participant_id": _participant_id(req.participant_id),
+        "timestamp": datetime.now(timezone.utc),
+        "user_note": req.user_note or "",
+    }
+
+    if req.from_cluster_id:
+        record["from_cluster_id"] = _object_id(req.from_cluster_id, "from_cluster_id")
+    if req.to_cluster_id:
+        record["to_cluster_id"] = _object_id(req.to_cluster_id, "to_cluster_id")
+    if req.suggested_cluster_id:
+        record["suggested_cluster_id"] = _object_id(
+            req.suggested_cluster_id,
+            "suggested_cluster_id",
+        )
+    if req.suggestion_score is not None:
+        record["suggestion_score"] = req.suggestion_score
+
+    result = get_db()["clusterFeedback"].insert_one(record)
+    return {"ok": True, "feedback_id": str(result.inserted_id)}
+
+
+@router.get("/latest-state/{doc_id}")
+def get_latest_feedback_state(doc_id: str, participant: str = "TEST"):
+    """
+    Return the latest provenance action for each fragment for one participant.
+
+    The adjudication key is timestamp descending, then _id descending. This keeps
+    restore behaviour deterministic when two events are recorded very close
+    together.
+    """
+    db = get_db()
+    doc_oid = _object_id(doc_id, "doc_id")
+    participant_id = _participant_id(participant)
+
+    pipeline = [
+        {"$match": {"doc_id": doc_oid, "participant_id": participant_id}},
+        {"$sort": {"timestamp": -1, "_id": -1}},
+        {"$group": {"_id": "$fragment_id", "record": {"$first": "$$ROOT"}}},
+    ]
+
+    states = []
+    for row in db["clusterFeedback"].aggregate(pipeline):
+        record = row["record"]
+        state = {
+            "fragment_id": str(row["_id"]),
+            "feedback_id": str(record["_id"]),
+            "latest_action": record.get("action", "move"),
+            "participant_id": participant_id,
+        }
+
+        timestamp = record.get("timestamp")
+        if timestamp:
+            state["timestamp"] = timestamp.isoformat()
+        if record.get("from_cluster_id"):
+            state["from_cluster_id"] = str(record["from_cluster_id"])
+        if record.get("to_cluster_id"):
+            state["to_cluster_id"] = str(record["to_cluster_id"])
+        if record.get("suggested_cluster_id"):
+            state["suggested_cluster_id"] = str(record["suggested_cluster_id"])
+
+        states.append(state)
+
+    return {"participant_id": participant_id, "states": states}
+
+
 @router.post("/recluster")
 def record_feedback(req: FeedbackRequest):
     """
@@ -43,12 +164,29 @@ def record_feedback(req: FeedbackRequest):
     """
     db = get_db()
 
+    action = req.action.strip()
+    if action not in {"move", "accept_suggestion"}:
+        raise HTTPException(
+            status_code=422,
+            detail="/feedback/recluster only accepts move or accept_suggestion.",
+        )
+
+    if action == "accept_suggestion" and not req.suggested_cluster_id:
+        raise HTTPException(status_code=422, detail="accept_suggestion requires suggested_cluster_id.")
+
     try:
         frag_oid = ObjectId(req.fragment_id)
         from_oid = ObjectId(req.from_cluster_id)
         to_oid = ObjectId(req.to_cluster_id)
+        suggested_oid = ObjectId(req.suggested_cluster_id) if req.suggested_cluster_id else None
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId in request.")
+
+    if action == "accept_suggestion" and suggested_oid != to_oid:
+        raise HTTPException(
+            status_code=422,
+            detail="accept_suggestion requires suggested_cluster_id to match to_cluster_id.",
+        )
 
     frag = db["fragments"].find_one({"_id": frag_oid})
     if not frag:
@@ -57,14 +195,22 @@ def record_feedback(req: FeedbackRequest):
     # Store doc_id on the feedback record so we can count per-survey
     doc_id = frag.get("docid")
 
-    db["clusterFeedback"].insert_one({
+    record = {
         "fragment_id": frag_oid,
         "doc_id": doc_id,
         "from_cluster_id": from_oid,
         "to_cluster_id": to_oid,
+        "action": action,
+        "participant_id": _participant_id(req.participant_id),
         "timestamp": datetime.now(timezone.utc),
         "user_note": req.user_note,
-    })
+    }
+    if suggested_oid:
+        record["suggested_cluster_id"] = suggested_oid
+    if req.suggestion_score is not None:
+        record["suggestion_score"] = req.suggestion_score
+
+    db["clusterFeedback"].insert_one(record)
 
     # Move fragment to new cluster
     db["fragments"].update_one(
@@ -119,7 +265,13 @@ def get_feedback_count(doc_id: str):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid doc_id")
 
-    count = db["clusterFeedback"].count_documents({"doc_id": doc_oid})
+    count = db["clusterFeedback"].count_documents({
+        "doc_id": doc_oid,
+        "$or": [
+            {"action": {"$exists": False}},  # legacy records are historical moves
+            {"action": {"$in": ["move", "accept_suggestion"]}},
+        ],
+    })
     return {"count": count}
 
 
