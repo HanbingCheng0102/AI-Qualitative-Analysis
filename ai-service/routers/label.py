@@ -8,6 +8,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routers.label_freeze import reject_if_labels_frozen
 from services import labeller
 from services.mongo_client import get_db
 
@@ -24,6 +25,7 @@ def label_clusters(req: LabelRequest):
     Label a list of clusters using the configured LLM backend.
     Returns {labelled: [{cluster_id, label, summary}]}.
     """
+    reject_if_labels_frozen("label_clusters")
     db = get_db()
     results = []
 

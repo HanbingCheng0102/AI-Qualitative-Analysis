@@ -10,6 +10,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routers.label_freeze import reject_if_labels_frozen
 from services import clusterer
 from services.mongo_client import get_db
 from models.cluster_schema import GraphData, GraphEdge, GraphNode
@@ -36,6 +37,7 @@ def run_clustering(req: ClusterRequest):
     Creates cluster documents and updates fragment.cluster_id.
     Returns {cluster_count, noise_count, cluster_ids}.
     """
+    reject_if_labels_frozen("cluster_run")
     db = get_db()
 
     try:

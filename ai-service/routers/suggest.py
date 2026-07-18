@@ -10,6 +10,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routers.label_freeze import reject_if_labels_frozen
 from services import labeller, llm_clusterer
 from services.mongo_client import get_db
 
@@ -343,6 +344,7 @@ def save_manual_clusters(req: SaveRequest):
     Removes any existing clusters for the doc first, then creates one cluster
     per group, computes centroids, and labels each via LLM.
     """
+    reject_if_labels_frozen("save_manual_clusters")
     db = get_db()
 
     try:

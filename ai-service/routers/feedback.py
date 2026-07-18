@@ -11,7 +11,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services import labeller
+from services import experiment_config, labeller
 from services.mongo_client import get_db
 
 router = APIRouter()
@@ -218,7 +218,8 @@ def get_latest_feedback_state(doc_id: str, participant: str = "TEST"):
 @router.post("/recluster")
 def record_feedback(req: FeedbackRequest):
     """
-    Record a re-coding event and re-label the two affected clusters.
+    Record a re-coding event and, unless labels are frozen, re-label the two
+    affected clusters.
     """
     db = get_db()
 
@@ -305,26 +306,27 @@ def record_feedback(req: FeedbackRequest):
         new_centroid = embs.mean(axis=0).tolist()
         db["clusters"].update_one({"_id": to_oid}, {"$set": {"centroid": new_centroid}})
 
-    # Re-label both affected clusters
-    for cluster_oid in (from_oid, to_oid):
-        cluster = db["clusters"].find_one({"_id": cluster_oid})
-        if not cluster:
-            continue
-        frags = list(db["fragments"].find(
-            {"cluster_id": cluster_oid, "redacted_text": {"$ne": None}},
-            {"redacted_text": 1},
-            limit=10,
-        ))
-        if not frags:
-            continue
-        sample_texts = [f["redacted_text"] for f in frags]
-        result = labeller.label_cluster(sample_texts)
-        db["clusters"].update_one(
-            {"_id": cluster_oid},
-            {"$set": {"label": result["label"], "summary": result["summary"]}},
-        )
+    labels_frozen = experiment_config.FREEZE_LABELS
+    if not labels_frozen:
+        for cluster_oid in (from_oid, to_oid):
+            cluster = db["clusters"].find_one({"_id": cluster_oid})
+            if not cluster:
+                continue
+            frags = list(db["fragments"].find(
+                {"cluster_id": cluster_oid, "redacted_text": {"$ne": None}},
+                {"redacted_text": 1},
+                limit=10,
+            ))
+            if not frags:
+                continue
+            sample_texts = [f["redacted_text"] for f in frags]
+            result = labeller.label_cluster(sample_texts)
+            db["clusters"].update_one(
+                {"_id": cluster_oid},
+                {"$set": {"label": result["label"], "summary": result["summary"]}},
+            )
 
-    return {"ok": True}
+    return {"ok": True, "labels_frozen": labels_frozen}
 
 
 @router.get("/count/{doc_id}")

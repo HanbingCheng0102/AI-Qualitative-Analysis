@@ -71,4 +71,5 @@ def validate_active_backend_configuration(
 
 LLM_BACKEND = validate_backend_name(os.environ.get("LLM_BACKEND", "anthropic"))
 LLM_STRICT_MODE = read_bool_env("LLM_STRICT_MODE", default=False)
+FREEZE_LABELS = read_bool_env("FREEZE_LABELS", default=False)
 validate_active_backend_configuration(LLM_BACKEND, LLM_STRICT_MODE)
