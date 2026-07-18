@@ -203,6 +203,25 @@ function logLocalSuggestionError(action, suggestion, error) {
     } catch (_) {}
 }
 
+function logLocalFeedbackError(action, docId, fragmentId, error) {
+    const entry = {
+        ts: new Date().toISOString(),
+        participant: getParticipant(),
+        action,
+        doc_id: docId,
+        fragment_id: fragmentId,
+        http_status: Number.isInteger(error?.status) ? error.status : null,
+        message: error?.message ?? String(error),
+    };
+    console.error("Feedback provenance request failed", entry);
+    try {
+        const key = "nieFeedbackProvenanceErrors";
+        const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+        const existing = Array.isArray(parsed) ? parsed : [];
+        window.localStorage.setItem(key, JSON.stringify([...existing.slice(-49), entry]));
+    } catch (_) {}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom node: Theme
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,6 +322,7 @@ function ResponseNode({ data }) {
     const [noteOpen, setNoteOpen]   = useState(false);
     const [note, setNote]           = useState(data.note ?? "");
     const [textOpen, setTextOpen]   = useState(false);
+    const confirmDisabled = data.isConfirmed || data.isConfirming;
 
     const save = async (val) => {
         setNote(val);
@@ -352,16 +372,20 @@ function ResponseNode({ data }) {
             <div className="px-2 pb-2">
                 <button
                     className={`mr-2 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
-                        data.isConfirmed
+                        confirmDisabled
                             ? "cursor-not-allowed border-green-200 bg-green-50 text-green-600"
                             : "border-green-300 text-green-700 hover:bg-green-50"
                     }`}
-                    disabled={data.isConfirmed}
-                    title={data.isConfirmed ? "Placement confirmed" : "Confirm this placement"}
+                    disabled={confirmDisabled}
+                    title={data.isConfirmed
+                        ? "Placement confirmed"
+                        : data.isConfirming
+                            ? "Saving confirmation"
+                            : "Confirm this placement"}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => {
                         e.stopPropagation();
-                        if (!data.isConfirmed) data.onConfirm?.(data.fragId, data.clusterId);
+                        if (!confirmDisabled) data.onConfirm?.(data.fragId, data.clusterId);
                     }}
                 >
                     ✓ Confirm
@@ -433,6 +457,23 @@ function GraphInner({ docId, participantId }) {
     const assignmentRef  = useRef({});
     // last highlighted cluster during drag (to clear it on leave)
     const prevTargetRef  = useRef(null);
+    // Per-fragment queues preserve the order in which provenance actions occurred.
+    const feedbackQueueRef = useRef(new Map());
+    const pendingConfirmRef = useRef(new Map());
+
+    const queueFeedbackAction = useCallback((fragId, action) => {
+        const previous = feedbackQueueRef.current.get(fragId) ?? Promise.resolve();
+        const current = previous.catch(() => undefined).then(action);
+        feedbackQueueRef.current.set(fragId, current);
+
+        const clearCompletedTail = () => {
+            if (feedbackQueueRef.current.get(fragId) === current) {
+                feedbackQueueRef.current.delete(fragId);
+            }
+        };
+        current.then(clearCompletedTail, clearCompletedTail);
+        return current;
+    }, []);
 
     const refreshLatestState = useCallback(async () => {
         if (!docId) return;
@@ -441,18 +482,93 @@ function GraphInner({ docId, participantId }) {
         setNodes(prev => applyConfirmedIdsToNodes(prev, confirmedIds));
     }, [docId, participantId, setNodes]);
 
+    const loadGraphProjection = useCallback(async (onConfirm) => {
+        const cls = await clusters_findAll(docId);
+        const fragsByCluster = {};
+        const assignment = {};
+        await Promise.all(cls.map(async cl => {
+            const cid = cl._id.toString();
+            const frags = await cluster_getFragments(cid);
+            fragsByCluster[cid] = frags;
+            frags.forEach(f => { assignment[f._id.toString()] = cid; });
+        }));
+
+        const [{ states }, { count }] = await Promise.all([
+            pipeline_getLatestFeedbackState(docId),
+            pipeline_getFeedbackCount(docId),
+        ]);
+        let nextSuggestions = [];
+        if (count >= SUGGEST_AT) {
+            const result = await pipeline_suggestPlacements(docId);
+            nextSuggestions = result.suggestions;
+        }
+
+        // Commit only after every read succeeds, so a failed recovery keeps the
+        // current screen intact instead of applying a partial projection.
+        assignmentRef.current = assignment;
+        const { nodes: nextNodes, edges: nextEdges } = buildLayout(cls, fragsByCluster);
+        const confirmedIds = confirmedIdsFromStates(states);
+        setClusterList(cls);
+        setNodes(applyConfirmedIdsToNodes(nextNodes, confirmedIds, onConfirm));
+        setEdges(nextEdges);
+        setFeedbackCount(count);
+        setSuggestions(nextSuggestions);
+    }, [docId, participantId, setClusterList, setEdges, setNodes]);
+
     const confirmFragment = useCallback(async (fragId, clusterId) => {
         if (!docId || !fragId || !clusterId) return;
-        try {
+
+        const pending = pendingConfirmRef.current.get(fragId);
+        if (pending) return pending;
+
+        setNodes(prev => prev.map(n =>
+            n.id === fragId
+                ? { ...n, data: { ...n.data, isConfirming: true } }
+                : n
+        ));
+
+        const request = queueFeedbackAction(fragId, async () => {
             await pipeline_logFeedback(docId, fragId, "confirm", {
                 fromClusterId: clusterId,
             });
-            await refreshLatestState();
+        });
+        pendingConfirmRef.current.set(fragId, request);
+
+        try {
+            await request;
+            try {
+                await refreshLatestState();
+            } catch (refreshError) {
+                logLocalFeedbackError(
+                    "confirm_projection_refresh",
+                    docId,
+                    fragId,
+                    refreshError,
+                );
+            }
         } catch (err) {
-            console.error(err);
-            setError(err.message);
+            logLocalFeedbackError("confirm", docId, fragId, err);
+            try {
+                await refreshLatestState();
+            } catch (recoveryError) {
+                logLocalFeedbackError(
+                    "confirm_projection_recovery",
+                    docId,
+                    fragId,
+                    recoveryError,
+                );
+            }
+        } finally {
+            if (pendingConfirmRef.current.get(fragId) === request) {
+                pendingConfirmRef.current.delete(fragId);
+            }
+            setNodes(prev => prev.map(n =>
+                n.id === fragId
+                    ? { ...n, data: { ...n.data, isConfirming: false } }
+                    : n
+            ));
         }
-    }, [docId, participantId, refreshLatestState]);
+    }, [docId, participantId, queueFeedbackAction, refreshLatestState, setNodes]);
 
     // ── Load ─────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -460,40 +576,24 @@ function GraphInner({ docId, participantId }) {
         setLoading(true);
         setError(null);
 
-        (async () => {
-            try {
-                const cls = await clusters_findAll(docId);
-                setClusterList(cls);
+        loadGraphProjection(confirmFragment)
+            .catch(err => setError(err.message))
+            .finally(() => setLoading(false));
+    }, [docId, participantId, confirmFragment, loadGraphProjection]);
 
-                const fragsByCluster = {};
-                const assignment = {};
-                await Promise.all(cls.map(async cl => {
-                    const cid = cl._id.toString();
-                    const frags = await cluster_getFragments(cid);
-                    fragsByCluster[cid] = frags;
-                    frags.forEach(f => { assignment[f._id.toString()] = cid; });
-                }));
-
-                assignmentRef.current = assignment;
-                const { nodes: n, edges: e } = buildLayout(cls, fragsByCluster);
-                const { states } = await pipeline_getLatestFeedbackState(docId);
-                const confirmedIds = confirmedIdsFromStates(states);
-                setNodes(applyConfirmedIdsToNodes(n, confirmedIds, confirmFragment));
-                setEdges(e);
-
-                const { count } = await pipeline_getFeedbackCount(docId);
-                setFeedbackCount(count);
-                if (count >= SUGGEST_AT) {
-                    const { suggestions: sg } = await pipeline_suggestPlacements(docId);
-                    setSuggestions(sg);
-                }
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [docId, participantId, confirmFragment]);
+    const recoverGraphProjection = useCallback(async (action, fragId, error) => {
+        logLocalFeedbackError(action, docId, fragId, error);
+        try {
+            await loadGraphProjection(confirmFragment);
+        } catch (recoveryError) {
+            logLocalFeedbackError(
+                `${action}_projection_recovery`,
+                docId,
+                fragId,
+                recoveryError,
+            );
+        }
+    }, [confirmFragment, docId, loadGraphProjection]);
 
     // ── Live drag: highlight nearest in-range theme ───────────────────────────
     const onNodeDrag = useCallback((_, draggedNode) => {
@@ -595,9 +695,12 @@ function GraphInner({ docId, participantId }) {
                 : n
         ));
 
-        // Persist
-        pipeline_recordFeedback(fragId, oldClusterId, newClusterId)
-            .then(async () => {
+        // Persist provenance actions for this fragment in interaction order.
+        queueFeedbackAction(
+            fragId,
+            () => pipeline_recordFeedback(fragId, oldClusterId, newClusterId),
+        ).then(async () => {
+            try {
                 await refreshLatestState();
                 const { count } = await pipeline_getFeedbackCount(docId);
                 setFeedbackCount(count);
@@ -605,9 +708,17 @@ function GraphInner({ docId, participantId }) {
                     const { suggestions: sg } = await pipeline_suggestPlacements(docId);
                     setSuggestions(sg);
                 }
-            })
-            .catch(console.error);
-    }, [clusterList, docId, getNodes, participantId, refreshLatestState]);
+            } catch (refreshError) {
+                await recoverGraphProjection(
+                    "move_projection_refresh",
+                    fragId,
+                    refreshError,
+                );
+            }
+        }, async err => {
+            await recoverGraphProjection("move", fragId, err);
+        });
+    }, [clusterList, docId, getNodes, participantId, queueFeedbackAction, recoverGraphProjection, refreshLatestState]);
 
     // ── Accept suggestion ─────────────────────────────────────────────────────
     const acceptSuggestion = async (s) => {
@@ -615,6 +726,10 @@ function GraphInner({ docId, participantId }) {
         const oldCid = assignmentRef.current[fragId] ?? "";
         const nc = clusterList.find(c => c._id.toString() === newCid);
         if (!nc) return;
+        if (!oldCid || oldCid === newCid) {
+            setSuggestions(prev => prev.filter(x => x.fragment_id !== fragId));
+            return;
+        }
         assignmentRef.current[fragId] = newCid;
         setEdges(prev => [...prev.filter(e => e.target !== fragId), {
             id: `e-${newCid}-${fragId}`, source: newCid, target: fragId, type: "straight",
@@ -625,15 +740,30 @@ function GraphInner({ docId, participantId }) {
         ));
         setSuggestions(prev => prev.filter(x => x.fragment_id !== fragId));
         try {
-            await pipeline_recordFeedback(fragId, oldCid, newCid, "", {
-                action: "accept_suggestion",
-                suggestedClusterId: newCid,
-                suggestionScore: s.confidence,
-            });
+            await queueFeedbackAction(
+                fragId,
+                () => pipeline_recordFeedback(fragId, oldCid, newCid, "", {
+                    action: "accept_suggestion",
+                    suggestedClusterId: newCid,
+                    suggestionScore: s.confidence,
+                }),
+            );
+        } catch (err) {
+            await recoverGraphProjection("accept_suggestion", fragId, err);
+            return;
+        }
+
+        try {
             await refreshLatestState();
             const { count } = await pipeline_getFeedbackCount(docId);
             setFeedbackCount(count);
-        } catch (err) { console.error(err); }
+        } catch (refreshError) {
+            await recoverGraphProjection(
+                "accept_suggestion_projection_refresh",
+                fragId,
+                refreshError,
+            );
+        }
     };
 
     const rejectSuggestion = async (s) => {

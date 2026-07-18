@@ -55,6 +55,30 @@ def _participant_id(value: str | None) -> str:
     return (value or "TEST").strip().upper() or "TEST"
 
 
+def _get_fragment(db, fragment_id: ObjectId) -> dict:
+    fragment = db["fragments"].find_one({"_id": fragment_id})
+    if not fragment:
+        raise HTTPException(status_code=404, detail="Fragment not found.")
+    return fragment
+
+
+def _get_cluster_for_doc(
+    db,
+    cluster_id: ObjectId,
+    doc_id: ObjectId,
+    field_name: str,
+) -> dict:
+    cluster = db["clusters"].find_one({"_id": cluster_id})
+    if not cluster:
+        raise HTTPException(status_code=404, detail=f"{field_name} not found.")
+    if cluster.get("survey_doc_id") != doc_id:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field_name} does not belong to the fragment document.",
+        )
+    return cluster
+
+
 def _cosine_sim(a, b) -> float:
     a = np.array(a, dtype=np.float32)
     b = np.array(b, dtype=np.float32)
@@ -87,6 +111,43 @@ def log_feedback(req: FeedbackLogRequest):
 
     doc_oid = _object_id(req.doc_id, "doc_id")
     frag_oid = _object_id(req.fragment_id, "fragment_id")
+    from_oid = (
+        _object_id(req.from_cluster_id, "from_cluster_id")
+        if req.from_cluster_id
+        else None
+    )
+    to_oid = (
+        _object_id(req.to_cluster_id, "to_cluster_id")
+        if req.to_cluster_id
+        else None
+    )
+    suggested_oid = (
+        _object_id(req.suggested_cluster_id, "suggested_cluster_id")
+        if req.suggested_cluster_id
+        else None
+    )
+
+    db = get_db()
+    fragment = _get_fragment(db, frag_oid)
+    if fragment.get("docid") != doc_oid:
+        raise HTTPException(
+            status_code=422,
+            detail="fragment_id does not belong to doc_id.",
+        )
+
+    for field_name, cluster_oid in (
+        ("from_cluster_id", from_oid),
+        ("to_cluster_id", to_oid),
+        ("suggested_cluster_id", suggested_oid),
+    ):
+        if cluster_oid:
+            _get_cluster_for_doc(db, cluster_oid, doc_oid, field_name)
+
+    if action == "confirm" and fragment.get("cluster_id") != from_oid:
+        raise HTTPException(
+            status_code=409,
+            detail="from_cluster_id is not the fragment's current cluster.",
+        )
 
     record = {
         "doc_id": doc_oid,
@@ -97,19 +158,16 @@ def log_feedback(req: FeedbackLogRequest):
         "user_note": req.user_note or "",
     }
 
-    if req.from_cluster_id:
-        record["from_cluster_id"] = _object_id(req.from_cluster_id, "from_cluster_id")
-    if req.to_cluster_id:
-        record["to_cluster_id"] = _object_id(req.to_cluster_id, "to_cluster_id")
-    if req.suggested_cluster_id:
-        record["suggested_cluster_id"] = _object_id(
-            req.suggested_cluster_id,
-            "suggested_cluster_id",
-        )
+    if from_oid:
+        record["from_cluster_id"] = from_oid
+    if to_oid:
+        record["to_cluster_id"] = to_oid
+    if suggested_oid:
+        record["suggested_cluster_id"] = suggested_oid
     if req.suggestion_score is not None:
         record["suggestion_score"] = req.suggestion_score
 
-    result = get_db()["clusterFeedback"].insert_one(record)
+    result = db["clusterFeedback"].insert_one(record)
     return {"ok": True, "feedback_id": str(result.inserted_id)}
 
 
@@ -174,13 +232,14 @@ def record_feedback(req: FeedbackRequest):
     if action == "accept_suggestion" and not req.suggested_cluster_id:
         raise HTTPException(status_code=422, detail="accept_suggestion requires suggested_cluster_id.")
 
-    try:
-        frag_oid = ObjectId(req.fragment_id)
-        from_oid = ObjectId(req.from_cluster_id)
-        to_oid = ObjectId(req.to_cluster_id)
-        suggested_oid = ObjectId(req.suggested_cluster_id) if req.suggested_cluster_id else None
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid ObjectId in request.")
+    frag_oid = _object_id(req.fragment_id, "fragment_id")
+    from_oid = _object_id(req.from_cluster_id, "from_cluster_id")
+    to_oid = _object_id(req.to_cluster_id, "to_cluster_id")
+    suggested_oid = (
+        _object_id(req.suggested_cluster_id, "suggested_cluster_id")
+        if req.suggested_cluster_id
+        else None
+    )
 
     if action == "accept_suggestion" and suggested_oid != to_oid:
         raise HTTPException(
@@ -188,12 +247,26 @@ def record_feedback(req: FeedbackRequest):
             detail="accept_suggestion requires suggested_cluster_id to match to_cluster_id.",
         )
 
-    frag = db["fragments"].find_one({"_id": frag_oid})
-    if not frag:
-        raise HTTPException(status_code=404, detail="Fragment not found.")
+    if from_oid == to_oid:
+        raise HTTPException(
+            status_code=422,
+            detail="from_cluster_id and to_cluster_id must be different.",
+        )
+
+    frag = _get_fragment(db, frag_oid)
 
     # Store doc_id on the feedback record so we can count per-survey
     doc_id = frag.get("docid")
+    _get_cluster_for_doc(db, from_oid, doc_id, "from_cluster_id")
+    _get_cluster_for_doc(db, to_oid, doc_id, "to_cluster_id")
+    if suggested_oid:
+        _get_cluster_for_doc(db, suggested_oid, doc_id, "suggested_cluster_id")
+
+    if frag.get("cluster_id") != from_oid:
+        raise HTTPException(
+            status_code=409,
+            detail="from_cluster_id is not the fragment's current cluster.",
+        )
 
     record = {
         "fragment_id": frag_oid,

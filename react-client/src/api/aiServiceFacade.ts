@@ -13,7 +13,11 @@ async function post(path: string, body: object) {
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail ?? `AI service error: ${res.status}`);
+        const error = new Error(
+            err.detail ?? `AI service error: ${res.status}`,
+        ) as Error & { status: number };
+        error.status = res.status;
+        throw error;
     }
     return res.json();
 }
