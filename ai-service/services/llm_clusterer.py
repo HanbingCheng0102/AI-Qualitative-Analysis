@@ -13,23 +13,98 @@ Both phases share the same LLM backend as labeller.py.
 from __future__ import annotations
 
 import json
+import logging
+import math
 import os
 import re
 from typing import Generator
 
 import numpy as np
 
+from services.experiment_config import LLM_BACKEND
+
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # LLM backend config (mirrors labeller.py)
 # ---------------------------------------------------------------------------
 
-LLM_BACKEND      = os.environ.get("LLM_BACKEND", "anthropic")
 ANTHROPIC_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL  = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 OPENAI_KEY       = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL     = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OLLAMA_BASE      = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "llama3")
+
+
+class LLMStrictModeError(RuntimeError):
+    """An LLM request or response that makes an experimental run invalid."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def _strict_call_error(stage: str, exc: Exception) -> LLMStrictModeError:
+    code = "INVALID_LLM_JSON" if isinstance(exc, json.JSONDecodeError) else "LLM_REQUEST_FAILED"
+    return LLMStrictModeError(code, f"LLM {stage} failed.")
+
+
+def _required_text(result: dict, field_name: str) -> str:
+    value = result.get(field_name)
+    if not isinstance(value, str) or not value.strip():
+        raise LLMStrictModeError(
+            "INVALID_LLM_RESPONSE",
+            f"LLM response requires a non-empty {field_name}.",
+        )
+    return value.strip()
+
+
+def _strict_cluster_id(value: object) -> int:
+    if isinstance(value, list):
+        if len(value) != 1:
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                (
+                    "LLM assign response returned an ambiguous cluster_id list; "
+                    f"received {len(value)} items."
+                ),
+            )
+        value = value[0]
+
+    if type(value) is int and value >= 0:
+        return value
+    if isinstance(value, float) and math.isfinite(value) and value >= 0 and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"\d+", text):
+            return int(text)
+        if re.fullmatch(r"\d+\.0+", text):
+            return int(text.split(".", 1)[0])
+    raise LLMStrictModeError(
+        "INVALID_LLM_RESPONSE",
+        (
+            "LLM assign response requires a losslessly integer cluster_id; "
+            f"received type {type(value).__name__}."
+        ),
+    )
+
+
+def _log_strict_assignment_rejection(
+    stage: str,
+    raw_response: str | None,
+    clusters: list[dict],
+    exc: LLMStrictModeError,
+) -> None:
+    logger.warning(
+        "Strict LLM assignment response rejected stage=%s code=%s "
+        "valid_cluster_ids=%s raw_response=%r",
+        stage,
+        exc.code,
+        sorted(cluster["id"] for cluster in clusters),
+        raw_response,
+    )
 
 
 def _strip_markdown(text: str) -> str:
@@ -58,18 +133,20 @@ def _call_llm(prompt: str) -> str:
             r.raise_for_status()
             return r.json()["response"]
 
-    # openai
-    import httpx
-    with httpx.Client(timeout=30) as c:
-        r = c.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {OPENAI_KEY}"},
-            json={"model": OPENAI_MODEL,
-                  "messages": [{"role": "user", "content": prompt}],
-                  "temperature": 0.2},
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+    if LLM_BACKEND == "openai":
+        import httpx
+        with httpx.Client(timeout=30) as c:
+            r = c.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_KEY}"},
+                json={"model": OPENAI_MODEL,
+                      "messages": [{"role": "user", "content": prompt}],
+                      "temperature": 0.2},
+            )
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"]
+
+    raise RuntimeError(f"Unsupported LLM_BACKEND={LLM_BACKEND!r}.")
 
 
 def _parse_json(text: str) -> dict:
@@ -80,7 +157,12 @@ def _parse_json(text: str) -> dict:
 # Phase 1 — Relevance filter
 # ---------------------------------------------------------------------------
 
-def is_relevant(fragment_text: str, research_question: str) -> bool:
+def is_relevant(
+    fragment_text: str,
+    research_question: str,
+    *,
+    strict: bool = False,
+) -> bool:
     """
     Ask the LLM whether fragment_text is relevant to the research_question.
     Returns True (keep) or False (discard).
@@ -99,8 +181,22 @@ Reply with JSON only — no markdown, no explanation:
 
     try:
         result = _parse_json(_call_llm(prompt))
+        if strict and not isinstance(result, dict):
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                "LLM relevance response must be a JSON object.",
+            )
+        if strict and type(result.get("relevant")) is not bool:
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                "LLM relevance response requires a boolean relevant field.",
+            )
         return bool(result.get("relevant", True))
-    except Exception:
+    except LLMStrictModeError:
+        raise
+    except Exception as exc:
+        if strict:
+            raise _strict_call_error("relevance filtering", exc) from exc
         return True  # fail open — keep the fragment
 
 
@@ -112,6 +208,8 @@ def assign_fragment(
     fragment_text: str,
     clusters: list[dict],
     research_question: str,
+    *,
+    strict: bool = False,
 ) -> dict:
     """
     Given the current cluster list, decide where fragment_text belongs.
@@ -134,12 +232,42 @@ Response:
 
 Reply with JSON only:
 {{"label": "<short theme label, max 6 words>", "summary": "<one sentence describing the theme>"}}"""
+        raw_response: str | None = None
         try:
-            result = _parse_json(_call_llm(prompt))
+            raw_response = _call_llm(prompt)
+            result = _parse_json(raw_response)
+            if strict:
+                if not isinstance(result, dict):
+                    raise LLMStrictModeError(
+                        "INVALID_LLM_RESPONSE",
+                        "LLM initial cluster response must be a JSON object.",
+                    )
+                label = _required_text(result, "label")
+                summary = _required_text(result, "summary")
+                return {"action": "new", "label": label, "summary": summary}
             return {"action": "new", "label": result["label"], "summary": result["summary"]}
-        except Exception:
+        except LLMStrictModeError as exc:
+            if strict:
+                _log_strict_assignment_rejection(
+                    "initial_cluster_assignment",
+                    raw_response,
+                    clusters,
+                    exc,
+                )
+            raise
+        except Exception as exc:
+            if strict:
+                strict_exc = _strict_call_error("initial cluster assignment", exc)
+                _log_strict_assignment_rejection(
+                    "initial_cluster_assignment",
+                    raw_response,
+                    clusters,
+                    strict_exc,
+                )
+                raise strict_exc from exc
             return {"action": "new", "label": "Theme 1", "summary": fragment_text[:80]}
 
+    valid_cluster_ids = sorted(c["id"] for c in clusters)
     cluster_list_text = "\n".join(
         f"  [{c['id']}] {c['label']} — {c['summary']}" for c in clusters
     )
@@ -150,6 +278,8 @@ Research focus: {research_question}
 Existing clusters:
 {cluster_list_text}
 
+Valid existing cluster IDs: {valid_cluster_ids}
+
 New response to place:
 \"\"\"{fragment_text}\"\"\"
 
@@ -158,23 +288,79 @@ Decide: does this response belong to one of the existing clusters, or does it re
 Rules:
 - Assign to an existing cluster if the response clearly fits its theme.
 - Create a new cluster only if the response introduces a genuinely distinct theme not covered above.
+- For action "assign", cluster_id must be exactly one integer from the valid existing cluster IDs above.
+- Never invent, infer, or increment a cluster ID.
+- If no existing cluster fits, return action "new" with label and summary, and do not include cluster_id.
 - Keep cluster labels short (max 6 words).
 
 Reply with JSON only — no markdown, no explanation.
-To assign:  {{"action": "assign", "cluster_id": <number>}}
-To create:  {{"action": "new", "label": "<label>", "summary": "<one sentence>"}}"""
+For assign, return only action and a valid integer cluster_id.
+For new, return only action, label, and summary."""
 
+    raw_response = None
     try:
-        result = _parse_json(_call_llm(prompt))
+        raw_response = _call_llm(prompt)
+        result = _parse_json(raw_response)
+        if strict and not isinstance(result, dict):
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                "LLM assignment response must be a JSON object.",
+            )
         if result.get("action") == "assign":
-            return {"action": "assign", "cluster_id": int(result["cluster_id"])}
-        else:
+            if strict:
+                cluster_id = _strict_cluster_id(result.get("cluster_id"))
+            else:
+                cluster_id = int(result["cluster_id"])
+            if strict and cluster_id not in valid_cluster_ids:
+                raise LLMStrictModeError(
+                    "INVALID_LLM_RESPONSE",
+                    (
+                        f"LLM assign response references unknown cluster_id={cluster_id}; "
+                        f"valid_cluster_ids={valid_cluster_ids}."
+                    ),
+                )
+            return {"action": "assign", "cluster_id": cluster_id}
+
+        if result.get("action") == "new":
+            if strict:
+                label = _required_text(result, "label")
+                summary = _required_text(result, "summary")
+                return {"action": "new", "label": label, "summary": summary}
             return {
                 "action": "new",
                 "label": result.get("label", "New Theme"),
                 "summary": result.get("summary", ""),
             }
-    except Exception:
+
+        if strict:
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                "LLM assignment response requires action assign or new.",
+            )
+        return {
+            "action": "new",
+            "label": result.get("label", "New Theme"),
+            "summary": result.get("summary", ""),
+        }
+    except LLMStrictModeError as exc:
+        if strict:
+            _log_strict_assignment_rejection(
+                "cluster_assignment",
+                raw_response,
+                clusters,
+                exc,
+            )
+        raise
+    except Exception as exc:
+        if strict:
+            strict_exc = _strict_call_error("cluster assignment", exc)
+            _log_strict_assignment_rejection(
+                "cluster_assignment",
+                raw_response,
+                clusters,
+                strict_exc,
+            )
+            raise strict_exc from exc
         # On parse failure, assign to cluster 0 as a safe fallback
         return {"action": "assign", "cluster_id": clusters[0]["id"]}
 
