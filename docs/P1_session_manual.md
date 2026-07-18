@@ -64,6 +64,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 ### 1.3 配置与代码版本
 
 - 查看仓库根目录 `.env`，目视核对 `LLM_BACKEND` 与对应 model name。
+- 正式文档生成必须设置 `LLM_STRICT_MODE=true`；服务启动后不得以 non-strict mode 生成正式文档。
 - 运行 `git status --short`；正式 session 要求无输出，即 clean worktree。
 - 运行 `git rev-parse HEAD`，记录当前 commit，并与正式文档的 `pipelineRuns.code_version` 核对。
 - `FREEZE_LABELS` 尚未实现；完成 session label freeze 后，在此处补充对应环境变量与预期值。
@@ -250,7 +251,8 @@ VERIFY_REL_2
 - “实际审查片段数”定义为该 participant 在该 doc 上至少留有一条 feedback 的不同 `fragment_id` 数。
 - confirm rate、move rate 按实际审查片段数归一化。
 - `pipelineRuns.doc_id` 与 `clusterFeedback.doc_id` 必须同为 BSON `ObjectId` 后再 join。
-- 只有包含 `finished_at`、backend/model 与正式条件一致、`code_version` 属批准 commit 的 run 才能进入实验。
+- 只有满足 `{status: "completed", finished_at: {$exists: true}}`、backend/model 与正式条件一致、`code_version` 属批准 commit 的 run 才能进入实验。
+- 遗留 `status: "running"` 的非当前 run 视为进程中断并作废；没有 `status` 字段的旧 P1 run 属开发数据，一律排除。
 - 正式分析同时使用 participant 排除名单与正式 doc ID whitelist；不能只依赖 survey name。
 - 模型间 cluster 粒度、过滤数量和实际审查数量的差异保留为结果，不通过删除记录强行等量化。
 
@@ -260,7 +262,8 @@ VERIFY_REL_2
 - P1 将 cosine suggestion 的 `SUGGEST_AT` 设为 `9999`，正式 session 不展示 suggestion cards。相关 accept/reject 代码保留但不属于当前参与者流程。
 - Cluster Graph 刷新后不会自动恢复 doc ID，需重新输入；刷新属于需记录的 session 异常。
 - 当前 `recluster` 仍会调用运行时 `labeller` 重命名来源簇与目标簇。`FREEZE_LABELS` 尚未实现，正式 session 不得在该问题解决前开始。
-- 当前 LLM 调用失败仍可能返回 heuristic fallback 结果。strict experiment mode 尚未实现，正式 9 个 doc 不得在该问题解决前生成。
+- Strict experiment mode 已实现并验证（commit `f7421cf`，2026-07-18）；正式文档生成必须使用该模式，使 LLM 请求失败或无效响应显式终止 run，不写入 heuristic fallback 聚类结果。
+- Assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID 并约束 `assign` 只能从中选择；三个模型统一使用该版本。正式 9 个 doc 生成前不得再修改 prompt；若必须修改，改动前生成的所有正式候选 run 均作废并重新生成。
 
 ## 7. 变更记录
 
@@ -268,3 +271,4 @@ VERIFY_REL_2
 | --- | --- |
 | 2026-07-18 | 建立正式 P1 实验运行手册；记录 participant、启动检查、失败恢复、分析裁定、测试身份排除和历史 feedback 包装边界。 |
 | 2026-07-18 | 更正 ERGO 状态；补充伦理程序、participant 排除名单审计及正式 doc ID whitelist。 |
+| 2026-07-18 | 记录 strict mode 验证结果、completed run 分析规则、中断 run 排除规则及 assignment prompt 冻结政策。 |
