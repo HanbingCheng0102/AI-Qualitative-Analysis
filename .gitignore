@@ -50,5 +50,6 @@ Thumbs.db
 jsdoc/
 
 # Restricted teaching/research inputs - local only
-test-data/transcripts-sexual_health.html
+test-data/transcripts-*.html
+test-data/Interview Transcripts-*.zip
 test-data/private/
