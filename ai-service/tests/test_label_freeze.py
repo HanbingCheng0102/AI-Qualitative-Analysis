@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -104,11 +105,13 @@ class FrozenMutationRouteTests(unittest.TestCase):
 
 
 class FrozenReclusterTests(unittest.TestCase):
-    def _database(self):
-        doc_oid = ObjectId()
-        frag_oid = ObjectId()
-        from_oid = ObjectId()
-        to_oid = ObjectId()
+    def _database(self, ids=None):
+        doc_oid, frag_oid, from_oid, to_oid = ids or (
+            ObjectId(),
+            ObjectId(),
+            ObjectId(),
+            ObjectId(),
+        )
         database = {
             "fragments": MagicMock(),
             "clusters": MagicMock(),
@@ -204,6 +207,108 @@ class FrozenReclusterTests(unittest.TestCase):
         self.assertEqual({"ok": True, "labels_frozen": False}, response)
         self.assertEqual(2, label_cluster.call_count)
         self.assertEqual(4, database["clusters"].update_one.call_count)
+
+    def test_freeze_only_changes_labels_and_response_metadata(self):
+        ids = (ObjectId(), ObjectId(), ObjectId(), ObjectId())
+        frozen_db, frozen_request, *_ = self._database(ids)
+        unfrozen_db, unfrozen_request, *_ = self._database(ids)
+        centroid_fragments = [
+            {"embedding": [1.0, 2.0]},
+            {"embedding": [3.0, 4.0]},
+        ]
+        frozen_db["fragments"].find.side_effect = [centroid_fragments]
+        unfrozen_db["fragments"].find.side_effect = [
+            centroid_fragments,
+            [{"redacted_text": "from sample"}],
+            [{"redacted_text": "to sample"}],
+        ]
+        doc_oid, _frag_oid, from_oid, to_oid = ids
+        unfrozen_db["clusters"].find_one.side_effect = [
+            {"_id": from_oid, "survey_doc_id": doc_oid},
+            {"_id": to_oid, "survey_doc_id": doc_oid},
+            {"_id": from_oid, "survey_doc_id": doc_oid},
+            {"_id": to_oid, "survey_doc_id": doc_oid},
+        ]
+
+        with patch.object(
+            experiment_config,
+            "FREEZE_LABELS",
+            True,
+        ), patch.object(
+            feedback,
+            "get_db",
+            return_value=frozen_db,
+        ), patch.object(
+            feedback.labeller,
+            "label_cluster",
+        ) as frozen_labeller:
+            frozen_response = feedback.record_feedback(frozen_request)
+
+        with patch.object(
+            experiment_config,
+            "FREEZE_LABELS",
+            False,
+        ), patch.object(
+            feedback,
+            "get_db",
+            return_value=unfrozen_db,
+        ), patch.object(
+            feedback.labeller,
+            "label_cluster",
+            side_effect=[
+                {"label": "From", "summary": "From summary"},
+                {"label": "To", "summary": "To summary"},
+            ],
+        ) as unfrozen_labeller:
+            unfrozen_response = feedback.record_feedback(unfrozen_request)
+
+        self.assertEqual({"ok": True, "labels_frozen": True}, frozen_response)
+        self.assertEqual({"ok": True, "labels_frozen": False}, unfrozen_response)
+        frozen_labeller.assert_not_called()
+        self.assertEqual(2, unfrozen_labeller.call_count)
+
+        def normalised_feedback_record(database):
+            record = dict(
+                database["clusterFeedback"].insert_one.call_args.args[0]
+            )
+            timestamp = record["timestamp"]
+            self.assertIsInstance(timestamp, datetime)
+            self.assertIsNotNone(timestamp.tzinfo)
+            self.assertEqual(0, timestamp.utcoffset().total_seconds())
+            record["timestamp"] = "<UTC datetime>"
+            return record
+
+        self.assertEqual(
+            normalised_feedback_record(frozen_db),
+            normalised_feedback_record(unfrozen_db),
+        )
+        self.assertEqual(
+            frozen_db["fragments"].update_one.call_args,
+            unfrozen_db["fragments"].update_one.call_args,
+        )
+
+        def split_cluster_updates(database):
+            placement_updates = []
+            label_updates = []
+            for update_call in database["clusters"].update_one.call_args_list:
+                query, update = update_call.args
+                changed_fields = set(update.get("$set", {}))
+                target = (
+                    label_updates
+                    if changed_fields == {"label", "summary"}
+                    else placement_updates
+                )
+                target.append((query, update))
+            return placement_updates, label_updates
+
+        frozen_placement, frozen_labels = split_cluster_updates(frozen_db)
+        unfrozen_placement, unfrozen_labels = split_cluster_updates(unfrozen_db)
+        self.assertEqual(frozen_placement, unfrozen_placement)
+        self.assertEqual(3, len(frozen_placement))
+        self.assertEqual([], frozen_labels)
+        self.assertEqual(2, len(unfrozen_labels))
+        for _query, update in unfrozen_labels:
+            self.assertEqual({"label", "summary"}, set(update["$set"]))
 
 
 if __name__ == "__main__":
