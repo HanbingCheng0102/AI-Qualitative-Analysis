@@ -297,14 +297,13 @@ COMP2300 material or for a multi-fragment formal batch.
 ## Pending Closure Conditions
 
 C2 is **not fully closed**. The permission-approved sexual-health smoke test is
-complete. Two conditions remain:
+complete, and the session manual was updated in commit `fb67891`. One condition
+remains:
 
-1. Update the session manual with the evidenced COMP2300 permission status and
-   the verified Azure backend state.
-2. Merge `codex/azure-mistral-backend` into `provenance-extension` and push the
+1. Merge `codex/azure-mistral-backend` into `provenance-extension` and push the
    verified result to the user's `origin` repository.
 
-Until both remaining conditions are complete, creating this evidence record
-must not be interpreted as C2 closure. The sampling-parameter decision and subsequent
+Until that condition is complete, creating this evidence record must not be
+interpreted as C2 closure. The sampling-parameter decision and subsequent
 prompt/parameter freeze also remain mandatory gates before Stage D formal
 document generation.
