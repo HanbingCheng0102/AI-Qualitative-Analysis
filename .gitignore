@@ -48,3 +48,7 @@ Thumbs.db
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 jsdoc/
+
+# Restricted teaching/research inputs - local only
+test-data/transcripts-sexual_health.html
+test-data/private/

@@ -223,6 +223,40 @@ They also prove that no cluster projection is persisted on this failure path.
 No real content-filter incident occurred during the non-sexual smoke tests, so
 this record does not claim a live Azure policy-block response.
 
+## Pre-Registered Sexual-Health Smoke Test
+
+Before running the permission-approved smoke test, the following probe and
+decision rules were fixed in this record:
+
+```text
+local file:     test-data/private/sexual_health_content_filter_smoke_1row.csv
+source:         COMP2300 P1 answer about stigma and help-seeking concerns
+selection:      participant answer only; interviewer and demographics excluded
+length:         110 words
+CSV SHA-256:    b1de182ceabc960dbb7fd399d2815a2c45830096d4b32ad756d432d4da66095c
+research focus: factors influencing access to and experience of sexual-health services
+attempt limit:  one terminal attempt, except for a non-filter infrastructure/protocol failure
+```
+
+The source HTML and derived CSV are ignored local files. Neither the COMP2300
+text nor a reversible representation of it may enter Git history.
+
+The outcome rules are:
+
+1. `status: "completed"` with a normal response is a terminal pass. It lowers
+   the observed content-filter risk for this one probe only.
+2. `failure_code: "CONTENT_FILTERED"` is a terminal policy finding, not a
+   software failure. Record whether it was the HTTP 400 or HTTP 200
+   `finish_reason=content_filter` form and whether it occurred during relevance
+   or initial assignment. Do not alter the prompt or retry.
+3. Any other network or protocol failure is not evidence about content
+   filtering. After fixing the environment, exactly one rerun is allowed and
+   both attempts must remain recorded.
+
+Because a one-row input only exercises relevance filtering followed by the
+first-cluster creation branch, this test cannot establish sexual-health
+performance for existing-cluster assignment or a full formal batch.
+
 ## Pending Closure Conditions
 
 C2 is **not fully closed**. All three conditions below remain required:
