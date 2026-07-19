@@ -294,16 +294,20 @@ observed filtering risk for the selected stigma/help-seeking passage only. It
 does not establish filter behaviour or clustering quality for the remaining
 COMP2300 material or for a multi-fragment formal batch.
 
-## Pending Closure Conditions
+## C2 Closure
 
-C2 is **not fully closed**. The permission-approved sexual-health smoke test is
-complete, and the session manual was updated in commit `fb67891`. One condition
-remains:
+C2 closed on 2026-07-19 after all recorded conditions were completed:
 
-1. Merge `codex/azure-mistral-backend` into `provenance-extension` and push the
-   verified result to the user's `origin` repository.
+```text
+sexual-health smoke test: completed once; no content filter
+session manual update:     fb67891
+merge commit:              73816a6
+merged branch:             provenance-extension
+push target:               origin/provenance-extension
+post-push divergence:      0 local-only / 0 remote-only commits
+post-merge automated test: 50 tests; OK
+```
 
-Until that condition is complete, creating this evidence record must not be
-interpreted as C2 closure. The sampling-parameter decision and subsequent
-prompt/parameter freeze also remain mandatory gates before Stage D formal
-document generation.
+The sampling-parameter decision and subsequent prompt/parameter freeze remain
+mandatory gates before Stage D formal document generation. They are the next
+methodology step and do not reopen the completed C2 backend-integration work.
