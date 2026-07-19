@@ -19,6 +19,9 @@ class LLMBackendConfig:
     api_key: str = field(default="", repr=False)
     base_url: str = ""
     timeout_seconds: float | None = None
+    temperature: float | None = None
+    seed: int | None = None
+    max_tokens: int | None = None
     model_version: str | None = None
     deployment_type: str | None = None
 
@@ -43,6 +46,22 @@ def get_active_backend_config(
         default=experiment_config.LLM_TIMEOUT_SECONDS,
         environ=source,
     )
+    temperature = experiment_config.read_temperature_env(
+        "LLM_TEMPERATURE",
+        default=experiment_config.LLM_TEMPERATURE,
+        environ=source,
+    )
+    seed = experiment_config.read_integer_env(
+        "LLM_SEED",
+        default=experiment_config.LLM_SEED,
+        environ=source,
+    )
+    max_tokens = experiment_config.read_integer_env(
+        "LLM_MAX_TOKENS",
+        default=experiment_config.LLM_MAX_TOKENS,
+        environ=source,
+        minimum=1,
+    )
 
     if backend == "anthropic":
         return LLMBackendConfig(
@@ -52,6 +71,8 @@ def get_active_backend_config(
             ),
             api_key=source.get("ANTHROPIC_API_KEY", ""),
             timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
     if backend == "azure":
         return LLMBackendConfig(
@@ -62,6 +83,9 @@ def get_active_backend_config(
                 source.get("AZURE_OPENAI_BASE_URL", "")
             ),
             timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            seed=seed,
+            max_tokens=max_tokens,
             model_version=source.get("AZURE_OPENAI_MODEL_VERSION", ""),
             deployment_type=source.get(
                 "AZURE_OPENAI_DEPLOYMENT_TYPE", ""
@@ -73,6 +97,9 @@ def get_active_backend_config(
             model_name=source.get("OPENAI_MODEL", "gpt-4o-mini"),
             api_key=source.get("OPENAI_API_KEY", ""),
             timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            seed=seed,
+            max_tokens=max_tokens,
         )
     if backend == "ollama":
         return LLMBackendConfig(
@@ -82,6 +109,9 @@ def get_active_backend_config(
                 "OLLAMA_BASE_URL", "http://localhost:11434"
             ).rstrip("/"),
             timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            seed=seed,
+            max_tokens=max_tokens,
         )
 
     raise RuntimeError(f"Unsupported LLM_BACKEND={backend!r}.")
@@ -99,13 +129,25 @@ def get_sensitive_values() -> tuple[str, ...]:
 
 def get_run_parameters() -> dict[str, object]:
     config = get_active_backend_config()
+    temperature = config.temperature
+    if temperature is None and config.backend in {"azure", "openai"}:
+        temperature = 0.2
+    max_tokens = config.max_tokens
+    if max_tokens is None and config.backend == "anthropic":
+        max_tokens = 512
+    seed_semantics = {
+        "anthropic": "unsupported",
+        "azure": "best_effort_beta",
+        "openai": "best_effort",
+        "ollama": "provider_supported",
+    }[config.backend]
     parameters: dict[str, object] = {
         "timeout_seconds": config.timeout_seconds,
         "max_retries": 0,
-        "temperature": (
-            0.2 if config.backend in {"azure", "openai"} else None
-        ),
-        "max_tokens": 512 if config.backend == "anthropic" else None,
+        "temperature": temperature,
+        "seed": config.seed if config.backend != "anthropic" else None,
+        "seed_semantics": seed_semantics,
+        "max_tokens": max_tokens,
     }
     if config.backend == "azure":
         parameters.update({
@@ -123,16 +165,23 @@ def _call_anthropic(
 ) -> str:
     import anthropic
 
-    max_tokens = 512 if purpose == "clustering" else 256
+    max_tokens = config.max_tokens
+    if max_tokens is None:
+        max_tokens = 512 if purpose == "clustering" else 256
     client = anthropic.Anthropic(
         api_key=config.api_key,
         timeout=config.timeout_seconds,
         max_retries=0,
     )
+    request_options: dict[str, object] = {
+        "model": config.model_name,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if config.temperature is not None:
+        request_options["temperature"] = config.temperature
     message = client.messages.create(
-        model=config.model_name,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}],
+        **request_options,
     )
     return message.content[0].text
 
@@ -183,7 +232,9 @@ def _call_openai_compatible(
 ) -> str:
     from openai import OpenAI
 
-    temperature = 0.2 if purpose == "clustering" else 0.3
+    temperature = config.temperature
+    if temperature is None:
+        temperature = 0.2 if purpose == "clustering" else 0.3
     client_options: dict[str, object] = {
         "api_key": config.api_key,
         "timeout": config.timeout_seconds,
@@ -195,11 +246,16 @@ def _call_openai_compatible(
         **client_options,
     )
     try:
-        response = client.chat.completions.create(
-            model=config.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-        )
+        request_options: dict[str, object] = {
+            "model": config.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+        }
+        if config.seed is not None:
+            request_options["seed"] = config.seed
+        if config.max_tokens is not None:
+            request_options["max_tokens"] = config.max_tokens
+        response = client.chat.completions.create(**request_options)
     except Exception as exc:
         if config.backend == "azure" and _is_azure_content_filter_error(exc):
             raise LLMProviderError(
@@ -249,14 +305,25 @@ def _call_ollama(
 ) -> str:
     import httpx
 
+    options: dict[str, object] = {}
+    if config.temperature is not None:
+        options["temperature"] = config.temperature
+    if config.seed is not None:
+        options["seed"] = config.seed
+    if config.max_tokens is not None:
+        options["num_predict"] = config.max_tokens
+    request_body: dict[str, object] = {
+        "model": config.model_name,
+        "prompt": prompt,
+        "stream": False,
+    }
+    if options:
+        request_body["options"] = options
+
     with httpx.Client(timeout=config.timeout_seconds) as client:
         response = client.post(
             f"{config.base_url}/api/generate",
-            json={
-                "model": config.model_name,
-                "prompt": prompt,
-                "stream": False,
-            },
+            json=request_body,
         )
         response.raise_for_status()
         return response.json()["response"]

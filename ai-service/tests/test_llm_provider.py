@@ -55,6 +55,9 @@ class LLMProviderConfigurationTests(unittest.TestCase):
             "AZURE_OPENAI_MODEL_VERSION": "1",
             "AZURE_OPENAI_DEPLOYMENT_TYPE": "GlobalStandard",
             "LLM_TIMEOUT_SECONDS": "60",
+            "LLM_TEMPERATURE": "0",
+            "LLM_SEED": "42",
+            "LLM_MAX_TOKENS": "1024",
         })
 
         self.assertEqual("azure", config.backend)
@@ -62,6 +65,9 @@ class LLMProviderConfigurationTests(unittest.TestCase):
         self.assertEqual("1", config.model_version)
         self.assertEqual("GlobalStandard", config.deployment_type)
         self.assertEqual(60, config.timeout_seconds)
+        self.assertEqual(0, config.temperature)
+        self.assertEqual(42, config.seed)
+        self.assertEqual(1024, config.max_tokens)
 
     def test_call_text_dispatches_to_selected_backend(self):
         config = llm_provider.LLMBackendConfig(
@@ -157,6 +163,9 @@ class LLMProviderConfigurationTests(unittest.TestCase):
             timeout_seconds=60,
             model_version="1",
             deployment_type="GlobalStandard",
+            temperature=0,
+            seed=42,
+            max_tokens=1024,
         )
         client = MagicMock()
         client.chat.completions.create.return_value = SimpleNamespace(
@@ -183,8 +192,83 @@ class LLMProviderConfigurationTests(unittest.TestCase):
         client.chat.completions.create.assert_called_once_with(
             model="Mistral-Large-3",
             messages=[{"role": "user", "content": "prompt"}],
-            temperature=0.2,
+            temperature=0,
+            seed=42,
+            max_tokens=1024,
         )
+
+    def test_ollama_receives_the_frozen_sampling_profile(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="ollama",
+            model_name="llama3.2:3b",
+            base_url="http://localhost:11434",
+            timeout_seconds=60,
+            temperature=0,
+            seed=42,
+            max_tokens=1024,
+        )
+        response = MagicMock()
+        response.json.return_value = {"response": "result"}
+        client = MagicMock()
+        client.post.return_value = response
+        context = MagicMock()
+        context.__enter__.return_value = client
+
+        with patch("httpx.Client", return_value=context) as constructor:
+            result = llm_provider._call_ollama(
+                "prompt",
+                config,
+                "clustering",
+            )
+
+        self.assertEqual("result", result)
+        constructor.assert_called_once_with(timeout=60)
+        client.post.assert_called_once_with(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3.2:3b",
+                "prompt": "prompt",
+                "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "seed": 42,
+                    "num_predict": 1024,
+                },
+            },
+        )
+        response.raise_for_status.assert_called_once_with()
+
+    def test_ollama_without_sampling_profile_preserves_legacy_request(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="ollama",
+            model_name="llama3.2:3b",
+            base_url="http://localhost:11434",
+            timeout_seconds=60,
+        )
+        response = MagicMock()
+        response.json.return_value = {"response": "result"}
+        client = MagicMock()
+        client.post.return_value = response
+        context = MagicMock()
+        context.__enter__.return_value = client
+
+        with patch("httpx.Client", return_value=context):
+            result = llm_provider._call_ollama(
+                "prompt",
+                config,
+                "clustering",
+            )
+
+        self.assertEqual("result", result)
+        client.post.assert_called_once_with(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3.2:3b",
+                "prompt": "prompt",
+                "stream": False,
+            },
+        )
+        response.raise_for_status.assert_called_once_with()
 
     def test_azure_http_400_content_filter_has_safe_error_code(self):
         config = llm_provider.LLMBackendConfig(
@@ -264,6 +348,9 @@ class LLMProviderConfigurationTests(unittest.TestCase):
             timeout_seconds=60,
             model_version="1",
             deployment_type="GlobalStandard",
+            temperature=0,
+            seed=42,
+            max_tokens=1024,
         )
         with patch.object(
             llm_provider,
@@ -274,11 +361,34 @@ class LLMProviderConfigurationTests(unittest.TestCase):
 
         self.assertEqual(60, parameters["timeout_seconds"])
         self.assertEqual(0, parameters["max_retries"])
-        self.assertEqual(0.2, parameters["temperature"])
-        self.assertIsNone(parameters["max_tokens"])
+        self.assertEqual(0, parameters["temperature"])
+        self.assertEqual(42, parameters["seed"])
+        self.assertEqual("best_effort_beta", parameters["seed_semantics"])
+        self.assertEqual(1024, parameters["max_tokens"])
         self.assertEqual("openai_v1", parameters["provider_protocol"])
         self.assertEqual("1", parameters["model_version"])
         self.assertEqual("GlobalStandard", parameters["deployment_type"])
+
+    def test_ollama_run_parameters_record_provider_seed_semantics(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="ollama",
+            model_name="llama3.2:3b",
+            timeout_seconds=60,
+            temperature=0,
+            seed=42,
+            max_tokens=1024,
+        )
+        with patch.object(
+            llm_provider,
+            "get_active_backend_config",
+            return_value=config,
+        ):
+            parameters = llm_provider.get_run_parameters()
+
+        self.assertEqual(0, parameters["temperature"])
+        self.assertEqual(42, parameters["seed"])
+        self.assertEqual("provider_supported", parameters["seed_semantics"])
+        self.assertEqual(1024, parameters["max_tokens"])
 
 
 class SharedProviderCallSiteTests(unittest.TestCase):

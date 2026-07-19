@@ -36,6 +36,9 @@ class ExperimentConfigTests(unittest.TestCase):
             "OLLAMA_MODEL": "llama3.2:3b",
             "OLLAMA_BASE_URL": "http://localhost:11434",
             "LLM_TIMEOUT_SECONDS": "60",
+            "LLM_TEMPERATURE": "0",
+            "LLM_SEED": "42",
+            "LLM_MAX_TOKENS": "1024",
         }
         experiment_config.validate_active_backend_configuration(
             "ollama",
@@ -48,6 +51,9 @@ class ExperimentConfigTests(unittest.TestCase):
             "LLM_BACKEND": "openai",
             "OPENAI_MODEL": "test-model",
             "LLM_TIMEOUT_SECONDS": "60",
+            "LLM_TEMPERATURE": "0",
+            "LLM_SEED": "42",
+            "LLM_MAX_TOKENS": "1024",
         }
         with self.assertRaises(RuntimeError) as raised:
             experiment_config.validate_active_backend_configuration(
@@ -68,6 +74,9 @@ class ExperimentConfigTests(unittest.TestCase):
             "AZURE_OPENAI_MODEL_VERSION": "1",
             "AZURE_OPENAI_DEPLOYMENT_TYPE": "GlobalStandard",
             "LLM_TIMEOUT_SECONDS": "60",
+            "LLM_TEMPERATURE": "0",
+            "LLM_SEED": "42",
+            "LLM_MAX_TOKENS": "1024",
         }
         with self.assertRaises(RuntimeError) as raised:
             experiment_config.validate_active_backend_configuration(
@@ -107,6 +116,62 @@ class ExperimentConfigTests(unittest.TestCase):
                     default=60,
                     environ={"LLM_TIMEOUT_SECONDS": value},
                 )
+
+    def test_zero_temperature_is_valid_but_invalid_values_are_rejected(self):
+        self.assertEqual(
+            0,
+            experiment_config.read_temperature_env(
+                "LLM_TEMPERATURE",
+                environ={"LLM_TEMPERATURE": "0"},
+            ),
+        )
+        for value in ("-0.1", "2.1", "nan", "infinity", "cold"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                experiment_config.read_temperature_env(
+                    "LLM_TEMPERATURE",
+                    environ={"LLM_TEMPERATURE": value},
+                )
+
+    def test_sampling_integer_values_are_strictly_validated(self):
+        self.assertEqual(
+            42,
+            experiment_config.read_integer_env(
+                "LLM_SEED",
+                environ={"LLM_SEED": "42"},
+            ),
+        )
+        for value in ("-1", "42.0", "seed"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                experiment_config.read_integer_env(
+                    "LLM_SEED",
+                    environ={"LLM_SEED": value},
+                )
+        for value in ("0", "-1", "1024.0", "many"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                experiment_config.read_integer_env(
+                    "LLM_MAX_TOKENS",
+                    environ={"LLM_MAX_TOKENS": value},
+                    minimum=1,
+                )
+
+    def test_strict_ollama_requires_complete_sampling_profile(self):
+        environ = {
+            "OLLAMA_MODEL": "llama3.2:3b",
+            "OLLAMA_BASE_URL": "http://localhost:11434",
+            "LLM_TIMEOUT_SECONDS": "60",
+            "LLM_TEMPERATURE": "0",
+            "LLM_MAX_TOKENS": "1024",
+        }
+
+        with self.assertRaises(RuntimeError) as raised:
+            experiment_config.validate_active_backend_configuration(
+                "ollama",
+                True,
+                environ=environ,
+            )
+
+        self.assertIn("LLM_SEED", str(raised.exception))
+        self.assertNotIn("API_KEY", str(raised.exception))
 
 
 class LLMClustererStrictTests(unittest.TestCase):
@@ -379,8 +444,10 @@ class PipelineRunStateTests(unittest.TestCase):
         run_parameters = {
             "timeout_seconds": 60,
             "max_retries": 0,
-            "temperature": 0.2,
-            "max_tokens": None,
+            "temperature": 0,
+            "seed": 42,
+            "seed_semantics": "best_effort_beta",
+            "max_tokens": 1024,
             "provider_protocol": "openai_v1",
             "model_version": "1",
             "deployment_type": "GlobalStandard",
