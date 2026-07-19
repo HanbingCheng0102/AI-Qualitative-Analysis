@@ -257,18 +257,54 @@ Because a one-row input only exercises relevance filtering followed by the
 first-cluster creation branch, this test cannot establish sexual-health
 performance for existing-cluster assignment or a full formal batch.
 
+## Sexual-Health Smoke Test Result
+
+The pre-registered probe was run once. It reached the terminal-pass outcome;
+no retry was attempted. MongoDB recorded:
+
+```text
+run_id:          ObjectId("6a5cf34bcfc29aafa1f37fc9")
+doc_id:          ObjectId("6a5cf348cfc29aafa1f37fc7")
+document:        C2_AZURE_SEXUAL_HEALTH_SMOKE_batchA
+pipeline:        llm_semantic
+llm_backend:     azure
+model_name:      Mistral-Large-3
+params:
+  column_filters:    {}
+  timeout_seconds:   60
+  max_retries:       0
+  temperature:       0.2
+  max_tokens:        null
+  provider_protocol: openai_v1
+  model_version:     "1"
+  deployment_type:   GlobalStandard
+batch_label:     A
+started_at:      2026-07-19T15:54:51.647Z
+status:          completed
+strict_mode:     true
+code_version:    fbac702e310a6cadec25352d7da38a3abe01b130
+finished_at:     2026-07-19T15:54:57.541Z
+fragment_count:  1
+cluster_count:   1
+failure_fields:  none
+```
+
+Azure did not content-filter this selected sexual-health probe. This lowers the
+observed filtering risk for the selected stigma/help-seeking passage only. It
+does not establish filter behaviour or clustering quality for the remaining
+COMP2300 material or for a multi-fragment formal batch.
+
 ## Pending Closure Conditions
 
-C2 is **not fully closed**. All three conditions below remain required:
+C2 is **not fully closed**. The permission-approved sexual-health smoke test is
+complete. Two conditions remain:
 
-1. Run the real sexual-health smoke test after explicit COMP2300 data-use
-   permission is received, and record whether it completes or is content
-   filtered.
-2. Update the session manual only after the remaining verification is accepted.
-3. Merge `codex/azure-mistral-backend` into `provenance-extension` and push the
+1. Update the session manual with the evidenced COMP2300 permission status and
+   the verified Azure backend state.
+2. Merge `codex/azure-mistral-backend` into `provenance-extension` and push the
    verified result to the user's `origin` repository.
 
-Until all three are complete, creating this evidence record must not be
-interpreted as C2 closure. The sampling-parameter decision and subsequent
+Until both remaining conditions are complete, creating this evidence record
+must not be interpreted as C2 closure. The sampling-parameter decision and subsequent
 prompt/parameter freeze also remain mandatory gates before Stage D formal
 document generation.
