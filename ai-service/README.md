@@ -39,6 +39,14 @@ Required shared settings:
 - `MONGO_DB_NAME` - database name (default: `nie`)
 - `LLM_BACKEND` - `anthropic`, `azure`, `openai`, or `ollama`
 - `LLM_TIMEOUT_SECONDS` - request timeout recorded in `pipelineRuns.params`
+- `LLM_TEMPERATURE` - shared experiment temperature (`0` for formal runs)
+- `LLM_SEED` - fixed seed for Azure/OpenAI/Ollama (`42` for formal runs)
+- `LLM_MAX_TOKENS` - shared output cap (`1024` for formal runs; mapped to
+  Ollama `num_predict`)
+
+Strict Azure, OpenAI, and Ollama configurations require all three sampling
+settings. Azure seed reproducibility is best-effort; the requested seed and its
+provider semantics are recorded in `pipelineRuns.params`.
 
 For Azure Foundry v1:
 - `AZURE_OPENAI_BASE_URL` - the base URL ending in `/openai/v1/`, not the
