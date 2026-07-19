@@ -64,10 +64,11 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 ### 1.3 配置与代码版本
 
 - 查看仓库根目录 `.env`，目视核对 `LLM_BACKEND` 与对应 model name。
-- 正式文档生成必须设置 `LLM_STRICT_MODE=true`；服务启动后不得以 non-strict mode 生成正式文档。
+- 正式文档生成与正式 session 均必须设置 `LLM_STRICT_MODE=true` 和 `FREEZE_LABELS=true`；两个开关语义正交，可长期同时启用。
+- 两个开关均在 AI service 启动时读取；修改 `.env` 后必须完整重启 AI service，不能依赖热更新。
+- 在每场 session 记录中写明实际 `FREEZE_LABELS` 值，并目视核对其为 `true`。
 - 运行 `git status --short`；正式 session 要求无输出，即 clean worktree。
 - 运行 `git rev-parse HEAD`，记录当前 commit，并与正式文档的 `pipelineRuns.code_version` 核对。
-- `FREEZE_LABELS` 尚未实现；完成 session label freeze 后，在此处补充对应环境变量与预期值。
 
 ### 1.4 Participant 与浏览器
 
@@ -261,7 +262,8 @@ VERIFY_REL_2
 - `react-client/src/api/dataFacade.ts::cluster_recordFeedback` 调用 `storage.recordClusterFeedback`，属于 api-server 历史路径。当前实验 UI 没有调用它；P1 中勿用勿删，避免误认成第二条正式 feedback 写入路径。
 - P1 将 cosine suggestion 的 `SUGGEST_AT` 设为 `9999`，正式 session 不展示 suggestion cards。相关 accept/reject 代码保留但不属于当前参与者流程。
 - Cluster Graph 刷新后不会自动恢复 doc ID，需重新输入；刷新属于需记录的 session 异常。
-- 当前 `recluster` 仍会调用运行时 `labeller` 重命名来源簇与目标簇。`FREEZE_LABELS` 尚未实现，正式 session 不得在该问题解决前开始。
+- `FREEZE_LABELS` 已实现并验证（commit `fd49542`，2026-07-19）。启用时，`/feedback/recluster` 仍记录 provenance、移动 fragment、更新簇成员与 centroid，但跳过运行时 `labeller`，并返回 `labels_frozen: true`。
+- 启用 `FREEZE_LABELS` 时，`/cluster/run`、`/label/clusters`、`/suggest/save` 在任何数据库写入前返回 `423 Locked` 和 `labels_frozen`；`/llm-cluster/run` 不受 freeze 阻塞，继续由 strict mode 保护新文档生成。
 - Strict experiment mode 已实现并验证（commit `f7421cf`，2026-07-18）；正式文档生成必须使用该模式，使 LLM 请求失败或无效响应显式终止 run，不写入 heuristic fallback 聚类结果。
 - Assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID 并约束 `assign` 只能从中选择；三个模型统一使用该版本。正式 9 个 doc 生成前不得再修改 prompt；若必须修改，改动前生成的所有正式候选 run 均作废并重新生成。
 
@@ -272,3 +274,4 @@ VERIFY_REL_2
 | 2026-07-18 | 建立正式 P1 实验运行手册；记录 participant、启动检查、失败恢复、分析裁定、测试身份排除和历史 feedback 包装边界。 |
 | 2026-07-18 | 更正 ERGO 状态；补充伦理程序、participant 排除名单审计及正式 doc ID whitelist。 |
 | 2026-07-18 | 记录 strict mode 验证结果、completed run 分析规则、中断 run 排除规则及 assignment prompt 冻结政策。 |
+| 2026-07-19 | 记录 `FREEZE_LABELS` 全局改写守卫、recluster 冻结行为、423 拒绝边界及与 strict mode 的正交关系。 |
