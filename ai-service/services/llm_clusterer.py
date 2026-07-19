@@ -15,27 +15,14 @@ from __future__ import annotations
 import json
 import logging
 import math
-import os
 import re
 from typing import Generator
 
 import numpy as np
 
-from services.experiment_config import LLM_BACKEND
+from services import llm_provider
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# LLM backend config (mirrors labeller.py)
-# ---------------------------------------------------------------------------
-
-ANTHROPIC_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL  = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
-OPENAI_KEY       = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL     = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-OLLAMA_BASE      = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "llama3")
-
 
 class LLMStrictModeError(RuntimeError):
     """An LLM request or response that makes an experimental run invalid."""
@@ -115,38 +102,7 @@ def _strip_markdown(text: str) -> str:
 
 def _call_llm(prompt: str) -> str:
     """Call the configured LLM and return raw text."""
-    if LLM_BACKEND == "anthropic":
-        import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-        msg = client.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return msg.content[0].text
-
-    if LLM_BACKEND == "ollama":
-        import httpx
-        with httpx.Client(timeout=60) as c:
-            r = c.post(f"{OLLAMA_BASE}/api/generate",
-                       json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False})
-            r.raise_for_status()
-            return r.json()["response"]
-
-    if LLM_BACKEND == "openai":
-        import httpx
-        with httpx.Client(timeout=30) as c:
-            r = c.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENAI_KEY}"},
-                json={"model": OPENAI_MODEL,
-                      "messages": [{"role": "user", "content": prompt}],
-                      "temperature": 0.2},
-            )
-            r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"]
-
-    raise RuntimeError(f"Unsupported LLM_BACKEND={LLM_BACKEND!r}.")
+    return llm_provider.call_text(prompt, purpose="clustering")
 
 
 def _parse_json(text: str) -> dict:

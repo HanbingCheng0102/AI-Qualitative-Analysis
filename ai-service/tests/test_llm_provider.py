@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+import hashlib
+import sys
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+
+AI_SERVICE_ROOT = Path(__file__).resolve().parents[1]
+if str(AI_SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(AI_SERVICE_ROOT))
+
+from services import labeller, llm_clusterer, llm_provider
+from routers import llm_cluster
+
+
+class LLMProviderConfigurationTests(unittest.TestCase):
+    def test_ollama_configuration_preserves_legacy_timeout(self):
+        config = llm_provider.get_active_backend_config({
+            "LLM_BACKEND": "ollama",
+            "OLLAMA_MODEL": "llama3.2:3b",
+            "OLLAMA_BASE_URL": "http://localhost:11434/",
+        })
+
+        self.assertEqual("ollama", config.backend)
+        self.assertEqual("llama3.2:3b", config.model_name)
+        self.assertEqual("http://localhost:11434", config.base_url)
+        self.assertEqual(60, config.timeout_seconds)
+
+    def test_openai_configuration_preserves_legacy_timeout(self):
+        config = llm_provider.get_active_backend_config({
+            "LLM_BACKEND": "openai",
+            "OPENAI_MODEL": "test-model",
+            "OPENAI_API_KEY": "test-key",
+        })
+
+        self.assertEqual("openai", config.backend)
+        self.assertEqual("test-model", config.model_name)
+        self.assertEqual(30, config.timeout_seconds)
+
+    def test_call_text_dispatches_to_selected_backend(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="ollama",
+            model_name="test-model",
+            base_url="http://localhost:11434",
+            timeout_seconds=60,
+        )
+        with patch.object(
+            llm_provider,
+            "get_active_backend_config",
+            return_value=config,
+        ), patch.object(
+            llm_provider,
+            "_call_ollama",
+            return_value="result",
+        ) as call:
+            result = llm_provider.call_text("prompt", purpose="clustering")
+
+        self.assertEqual("result", result)
+        call.assert_called_once_with("prompt", config, "clustering")
+
+    def test_openai_client_disables_hidden_retries(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="openai",
+            model_name="test-model",
+            api_key="test-key",
+            timeout_seconds=30,
+        )
+        client = MagicMock()
+        client.chat.completions.create.return_value = SimpleNamespace(
+            choices=[
+                SimpleNamespace(message=SimpleNamespace(content="response"))
+            ]
+        )
+
+        with patch("openai.OpenAI", return_value=client) as constructor:
+            result = llm_provider._call_openai(
+                "prompt",
+                config,
+                "clustering",
+            )
+
+        self.assertEqual("response", result)
+        constructor.assert_called_once_with(
+            api_key="test-key",
+            timeout=30,
+            max_retries=0,
+        )
+        client.chat.completions.create.assert_called_once_with(
+            model="test-model",
+            messages=[{"role": "user", "content": "prompt"}],
+            temperature=0.2,
+        )
+
+
+class SharedProviderCallSiteTests(unittest.TestCase):
+    def test_clusterer_uses_shared_provider(self):
+        with patch.object(
+            llm_provider,
+            "call_text",
+            return_value="response",
+        ) as call:
+            result = llm_clusterer._call_llm("prompt")
+
+        self.assertEqual("response", result)
+        call.assert_called_once_with("prompt", purpose="clustering")
+
+    def test_labeller_uses_shared_provider(self):
+        with patch.object(
+            llm_provider,
+            "call_text",
+            return_value='{"label": "Theme", "summary": "Summary"}',
+        ) as call:
+            result = labeller.label_cluster(["response"])
+
+        self.assertEqual({"label": "Theme", "summary": "Summary"}, result)
+        call.assert_called_once_with(
+            labeller._build_prompt(["response"]),
+            purpose="labelling",
+        )
+
+    def test_pipeline_metadata_uses_shared_provider(self):
+        with patch.object(
+            llm_provider,
+            "get_model_metadata",
+            return_value=("ollama", "llama3.2:3b"),
+        ) as metadata:
+            result = llm_cluster._get_model_metadata()
+
+        self.assertEqual(("ollama", "llama3.2:3b"), result)
+        metadata.assert_called_once_with()
+
+    def test_pipeline_failure_message_redacts_provider_secret(self):
+        with patch.object(
+            llm_provider,
+            "get_sensitive_values",
+            return_value=("secret-value",),
+        ):
+            result = llm_cluster._safe_failure_message(
+                RuntimeError("request failed for secret-value")
+            )
+
+        self.assertEqual("request failed for [REDACTED]", result)
+
+
+class PromptFreezeTests(unittest.TestCase):
+    EXPECTED_HASHES = {
+        "relevance": "189d583cbd52e0839250fafe3cf0e73f22cf27b7cc13344178bf10435b4ab1a4",
+        "initial_assignment": "d8ca347ba17007747c8ca0783edde2e2983dc70f19d6e0749474511972bef06b",
+        "existing_assignment": "7bb5a5d9f0a70965314a1bc3a642f97c5410dc37c8ccab52b04926e134f7343d",
+        "labelling": "f3c5e4b0e97cbfe06e90b7b83d28cd0c2fb50d00ec9fb181515e9467bc395536",
+    }
+
+    @staticmethod
+    def _digest(prompt: str) -> str:
+        return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _capture_prompt(call, response: str) -> str:
+        prompts: list[str] = []
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            side_effect=lambda prompt: prompts.append(prompt) or response,
+        ):
+            call()
+        return prompts[0]
+
+    def test_prompts_match_pre_refactor_byte_hashes(self):
+        prompts = {
+            "relevance": self._capture_prompt(
+                lambda: llm_clusterer.is_relevant("response", "question"),
+                '{"relevant": true}',
+            ),
+            "initial_assignment": self._capture_prompt(
+                lambda: llm_clusterer.assign_fragment(
+                    "response", [], "question"
+                ),
+                '{"label": "Theme", "summary": "Summary"}',
+            ),
+            "existing_assignment": self._capture_prompt(
+                lambda: llm_clusterer.assign_fragment(
+                    "response",
+                    [{"id": 0, "label": "Theme", "summary": "Summary"}],
+                    "question",
+                ),
+                '{"action": "assign", "cluster_id": 0}',
+            ),
+            "labelling": labeller._build_prompt(["response 1", "response 2"]),
+        }
+
+        actual = {
+            name: self._digest(prompt)
+            for name, prompt in prompts.items()
+        }
+        self.assertEqual(self.EXPECTED_HASHES, actual)
+
+
+if __name__ == "__main__":
+    unittest.main()
