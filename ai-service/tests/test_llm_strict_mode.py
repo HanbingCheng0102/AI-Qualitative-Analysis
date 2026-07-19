@@ -35,6 +35,7 @@ class ExperimentConfigTests(unittest.TestCase):
             "LLM_BACKEND": "ollama",
             "OLLAMA_MODEL": "llama3.2:3b",
             "OLLAMA_BASE_URL": "http://localhost:11434",
+            "LLM_TIMEOUT_SECONDS": "60",
         }
         experiment_config.validate_active_backend_configuration(
             "ollama",
@@ -46,6 +47,7 @@ class ExperimentConfigTests(unittest.TestCase):
         environ = {
             "LLM_BACKEND": "openai",
             "OPENAI_MODEL": "test-model",
+            "LLM_TIMEOUT_SECONDS": "60",
         }
         with self.assertRaises(RuntimeError) as raised:
             experiment_config.validate_active_backend_configuration(
@@ -55,6 +57,56 @@ class ExperimentConfigTests(unittest.TestCase):
             )
         self.assertIn("OPENAI_API_KEY", str(raised.exception))
         self.assertNotIn("ANTHROPIC_API_KEY", str(raised.exception))
+
+    def test_strict_azure_checks_only_azure_configuration(self):
+        environ = {
+            "LLM_BACKEND": "azure",
+            "AZURE_OPENAI_MODEL": "Mistral-Large-3",
+            "AZURE_OPENAI_BASE_URL": (
+                "https://example.services.ai.azure.com/openai/v1/"
+            ),
+            "AZURE_OPENAI_MODEL_VERSION": "1",
+            "AZURE_OPENAI_DEPLOYMENT_TYPE": "GlobalStandard",
+            "LLM_TIMEOUT_SECONDS": "60",
+        }
+        with self.assertRaises(RuntimeError) as raised:
+            experiment_config.validate_active_backend_configuration(
+                "azure",
+                True,
+                environ=environ,
+            )
+
+        message = str(raised.exception)
+        self.assertTrue(message.endswith("AZURE_OPENAI_API_KEY."))
+        self.assertEqual(1, message.count("API_KEY"))
+        self.assertNotIn("OLLAMA_MODEL", message)
+        self.assertNotIn("ANTHROPIC_API_KEY", message)
+
+    def test_azure_full_chat_completions_url_is_rejected(self):
+        with self.assertRaises(RuntimeError) as raised:
+            experiment_config.validate_azure_base_url(
+                "https://example.services.ai.azure.com/openai/v1/"
+                "chat/completions"
+            )
+
+        self.assertIn("not /chat/completions", str(raised.exception))
+
+    def test_azure_non_foundry_hostname_is_rejected(self):
+        with self.assertRaises(RuntimeError) as raised:
+            experiment_config.validate_azure_base_url(
+                "https://example.invalid/openai/v1/"
+            )
+
+        self.assertIn("Azure Foundry hostname", str(raised.exception))
+
+    def test_timeout_must_be_positive_and_finite(self):
+        for value in ("0", "-1", "nan", "infinity", "sixty"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                experiment_config.read_positive_float_env(
+                    "LLM_TIMEOUT_SECONDS",
+                    default=60,
+                    environ={"LLM_TIMEOUT_SECONDS": value},
+                )
 
 
 class LLMClustererStrictTests(unittest.TestCase):
@@ -312,6 +364,56 @@ class PipelineRunStateTests(unittest.TestCase):
         self.assertEqual("completed", completed["status"])
         self.assertIn("finished_at", completed)
 
+    def test_start_records_azure_deployment_metadata_and_parameters(self):
+        db = self._database()
+        doc_oid = ObjectId()
+        run_oid = ObjectId()
+        db["documents"].find_one.return_value = {"name": "P1_task1_batchA"}
+        db["pipelineRuns"].insert_one.return_value = SimpleNamespace(
+            inserted_id=run_oid
+        )
+        request = llm_cluster.LLMClusterRequest(
+            doc_id=str(doc_oid),
+            research_question="question",
+        )
+        run_parameters = {
+            "timeout_seconds": 60,
+            "max_retries": 0,
+            "temperature": 0.2,
+            "max_tokens": None,
+            "provider_protocol": "openai_v1",
+            "model_version": "1",
+            "deployment_type": "GlobalStandard",
+        }
+
+        with patch.object(
+            llm_cluster,
+            "_get_code_version",
+            return_value="abc123",
+        ), patch.object(
+            llm_cluster.llm_provider,
+            "get_model_metadata",
+            return_value=("azure", "Mistral-Large-3"),
+        ), patch.object(
+            llm_cluster.llm_provider,
+            "get_run_parameters",
+            return_value=run_parameters,
+        ):
+            llm_cluster._start_pipeline_run(
+                db,
+                request,
+                doc_oid,
+                True,
+            )
+
+        inserted = db["pipelineRuns"].insert_one.call_args.args[0]
+        self.assertEqual("azure", inserted["llm_backend"])
+        self.assertEqual("Mistral-Large-3", inserted["model_name"])
+        self.assertEqual(
+            {"column_filters": {}, **run_parameters},
+            inserted["params"],
+        )
+
     def test_mid_run_llm_failure_does_not_enter_persistence(self):
         db = self._database()
         doc_oid = ObjectId()
@@ -379,6 +481,57 @@ class PipelineRunStateTests(unittest.TestCase):
         self.assertEqual("ConnectionError", failed["failure_type"])
         self.assertEqual(fragments[10]["_id"], failed["failure_fragment_id"])
         self.assertIn("failed_at", failed)
+        self.assertNotIn("finished_at", failed)
+
+    def test_content_filter_failure_is_recorded_without_persistence(self):
+        db = self._database()
+        doc_oid = ObjectId()
+        run_oid = ObjectId()
+        fragment = {
+            "_id": ObjectId(),
+            "name": "R1",
+            "redacted_text": "response",
+            "embedding": [1.0],
+            "row_data": {},
+        }
+        db["fragments"].find.return_value = [fragment]
+        db["pipelineRuns"].update_one.return_value = SimpleNamespace(
+            matched_count=1
+        )
+        request = llm_cluster.LLMClusterRequest(
+            doc_id=str(doc_oid),
+            research_question="question",
+        )
+        error = llm_clusterer.LLMStrictModeError(
+            "CONTENT_FILTERED",
+            "Azure content filtering blocked the request or response.",
+        )
+
+        with patch.object(
+            llm_clusterer,
+            "is_relevant",
+            side_effect=error,
+        ), patch.object(llm_cluster.logger, "exception"):
+            events = [
+                json.loads(line)
+                for line in llm_cluster._run_pipeline(
+                    request,
+                    db,
+                    doc_oid,
+                    run_oid,
+                    True,
+                )
+            ]
+
+        self.assertEqual("error", events[-1]["event"])
+        db["clusters"].delete_many.assert_not_called()
+        db["clusters"].insert_one.assert_not_called()
+        db["fragments"].update_many.assert_not_called()
+        failed = db["pipelineRuns"].update_one.call_args.args[1]["$set"]
+        self.assertEqual("failed", failed["status"])
+        self.assertEqual("CONTENT_FILTERED", failed["failure_code"])
+        self.assertEqual("relevance_filter", failed["failure_stage"])
+        self.assertEqual(fragment["_id"], failed["failure_fragment_id"])
         self.assertNotIn("finished_at", failed)
 
 

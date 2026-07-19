@@ -33,6 +33,8 @@ class LLMStrictModeError(RuntimeError):
 
 
 def _strict_call_error(stage: str, exc: Exception) -> LLMStrictModeError:
+    if isinstance(exc, llm_provider.LLMProviderError):
+        return LLMStrictModeError(exc.code, str(exc))
     code = "INVALID_LLM_JSON" if isinstance(exc, json.JSONDecodeError) else "LLM_REQUEST_FAILED"
     return LLMStrictModeError(code, f"LLM {stage} failed.")
 

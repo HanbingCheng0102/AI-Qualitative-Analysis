@@ -7,6 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import httpx
+from openai import BadRequestError
+
 
 AI_SERVICE_ROOT = Path(__file__).resolve().parents[1]
 if str(AI_SERVICE_ROOT) not in sys.path:
@@ -29,16 +32,36 @@ class LLMProviderConfigurationTests(unittest.TestCase):
         self.assertEqual("http://localhost:11434", config.base_url)
         self.assertEqual(60, config.timeout_seconds)
 
-    def test_openai_configuration_preserves_legacy_timeout(self):
+    def test_openai_configuration_uses_shared_timeout(self):
         config = llm_provider.get_active_backend_config({
             "LLM_BACKEND": "openai",
             "OPENAI_MODEL": "test-model",
             "OPENAI_API_KEY": "test-key",
+            "LLM_TIMEOUT_SECONDS": "60",
         })
 
         self.assertEqual("openai", config.backend)
         self.assertEqual("test-model", config.model_name)
-        self.assertEqual(30, config.timeout_seconds)
+        self.assertEqual(60, config.timeout_seconds)
+
+    def test_azure_configuration_keeps_deployment_provenance(self):
+        config = llm_provider.get_active_backend_config({
+            "LLM_BACKEND": "azure",
+            "AZURE_OPENAI_MODEL": "Mistral-Large-3",
+            "AZURE_OPENAI_API_KEY": "test-key",
+            "AZURE_OPENAI_BASE_URL": (
+                "https://example.services.ai.azure.com/openai/v1/"
+            ),
+            "AZURE_OPENAI_MODEL_VERSION": "1",
+            "AZURE_OPENAI_DEPLOYMENT_TYPE": "GlobalStandard",
+            "LLM_TIMEOUT_SECONDS": "60",
+        })
+
+        self.assertEqual("azure", config.backend)
+        self.assertEqual("Mistral-Large-3", config.model_name)
+        self.assertEqual("1", config.model_version)
+        self.assertEqual("GlobalStandard", config.deployment_type)
+        self.assertEqual(60, config.timeout_seconds)
 
     def test_call_text_dispatches_to_selected_backend(self):
         config = llm_provider.LLMBackendConfig(
@@ -66,7 +89,7 @@ class LLMProviderConfigurationTests(unittest.TestCase):
             backend="openai",
             model_name="test-model",
             api_key="test-key",
-            timeout_seconds=30,
+            timeout_seconds=60,
         )
         client = MagicMock()
         client.chat.completions.create.return_value = SimpleNamespace(
@@ -85,7 +108,7 @@ class LLMProviderConfigurationTests(unittest.TestCase):
         self.assertEqual("response", result)
         constructor.assert_called_once_with(
             api_key="test-key",
-            timeout=30,
+            timeout=60,
             max_retries=0,
         )
         client.chat.completions.create.assert_called_once_with(
@@ -93,6 +116,169 @@ class LLMProviderConfigurationTests(unittest.TestCase):
             messages=[{"role": "user", "content": "prompt"}],
             temperature=0.2,
         )
+
+    def test_anthropic_client_uses_shared_timeout_without_retries(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="anthropic",
+            model_name="test-model",
+            api_key="test-key",
+            timeout_seconds=60,
+        )
+        client = MagicMock()
+        client.messages.create.return_value = SimpleNamespace(
+            content=[SimpleNamespace(text="response")]
+        )
+
+        with patch("anthropic.Anthropic", return_value=client) as constructor:
+            result = llm_provider._call_anthropic(
+                "prompt",
+                config,
+                "clustering",
+            )
+
+        self.assertEqual("response", result)
+        constructor.assert_called_once_with(
+            api_key="test-key",
+            timeout=60,
+            max_retries=0,
+        )
+        client.messages.create.assert_called_once_with(
+            model="test-model",
+            max_tokens=512,
+            messages=[{"role": "user", "content": "prompt"}],
+        )
+
+    def test_azure_uses_openai_v1_base_url_and_deployment_name(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="azure",
+            model_name="Mistral-Large-3",
+            api_key="test-key",
+            base_url="https://example.services.ai.azure.com/openai/v1/",
+            timeout_seconds=60,
+            model_version="1",
+            deployment_type="GlobalStandard",
+        )
+        client = MagicMock()
+        client.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(
+                finish_reason="stop",
+                message=SimpleNamespace(content="response"),
+            )]
+        )
+
+        with patch("openai.OpenAI", return_value=client) as constructor:
+            result = llm_provider._call_azure(
+                "prompt",
+                config,
+                "clustering",
+            )
+
+        self.assertEqual("response", result)
+        constructor.assert_called_once_with(
+            api_key="test-key",
+            base_url="https://example.services.ai.azure.com/openai/v1/",
+            timeout=60,
+            max_retries=0,
+        )
+        client.chat.completions.create.assert_called_once_with(
+            model="Mistral-Large-3",
+            messages=[{"role": "user", "content": "prompt"}],
+            temperature=0.2,
+        )
+
+    def test_azure_http_400_content_filter_has_safe_error_code(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="azure",
+            model_name="Mistral-Large-3",
+            api_key="test-key",
+            base_url="https://example.services.ai.azure.com/openai/v1/",
+            timeout_seconds=60,
+        )
+        request = httpx.Request(
+            "POST",
+            "https://example.services.ai.azure.com/openai/v1/chat/completions",
+        )
+        response = httpx.Response(400, request=request)
+        provider_error = BadRequestError(
+            "sensitive provider response",
+            response=response,
+            body={
+                "error": {
+                    "code": "content_filter",
+                    "innererror": {
+                        "code": "ResponsibleAIPolicyViolation"
+                    },
+                }
+            },
+        )
+        client = MagicMock()
+        client.chat.completions.create.side_effect = provider_error
+
+        with patch("openai.OpenAI", return_value=client):
+            with self.assertRaises(llm_provider.LLMProviderError) as raised:
+                llm_provider._call_azure("prompt", config, "clustering")
+
+        self.assertEqual("CONTENT_FILTERED", raised.exception.code)
+        self.assertNotIn("sensitive", str(raised.exception))
+
+    def test_azure_http_200_content_filter_has_safe_error_code(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="azure",
+            model_name="Mistral-Large-3",
+            api_key="test-key",
+            base_url="https://example.services.ai.azure.com/openai/v1/",
+            timeout_seconds=60,
+        )
+        client = MagicMock()
+        client.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(
+                finish_reason="content_filter",
+                message=SimpleNamespace(content=None),
+            )]
+        )
+
+        with patch("openai.OpenAI", return_value=client):
+            with self.assertRaises(llm_provider.LLMProviderError) as raised:
+                llm_provider._call_azure("prompt", config, "clustering")
+
+        self.assertEqual("CONTENT_FILTERED", raised.exception.code)
+
+    def test_content_filter_code_is_preserved_by_strict_mode(self):
+        provider_error = llm_provider.LLMProviderError(
+            "CONTENT_FILTERED",
+            "Azure content filtering blocked the request or response.",
+        )
+
+        strict_error = llm_clusterer._strict_call_error(
+            "relevance filtering",
+            provider_error,
+        )
+
+        self.assertEqual("CONTENT_FILTERED", strict_error.code)
+        self.assertNotIn("prompt", str(strict_error))
+
+    def test_azure_run_parameters_include_deployment_provenance(self):
+        config = llm_provider.LLMBackendConfig(
+            backend="azure",
+            model_name="Mistral-Large-3",
+            timeout_seconds=60,
+            model_version="1",
+            deployment_type="GlobalStandard",
+        )
+        with patch.object(
+            llm_provider,
+            "get_active_backend_config",
+            return_value=config,
+        ):
+            parameters = llm_provider.get_run_parameters()
+
+        self.assertEqual(60, parameters["timeout_seconds"])
+        self.assertEqual(0, parameters["max_retries"])
+        self.assertEqual(0.2, parameters["temperature"])
+        self.assertIsNone(parameters["max_tokens"])
+        self.assertEqual("openai_v1", parameters["provider_protocol"])
+        self.assertEqual("1", parameters["model_version"])
+        self.assertEqual("GlobalStandard", parameters["deployment_type"])
 
 
 class SharedProviderCallSiteTests(unittest.TestCase):

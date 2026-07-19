@@ -155,13 +155,17 @@ def _start_pipeline_run(
         document = db["documents"].find_one({"_id": doc_oid}, {"name": 1})
         survey_name = document.get("name") if document else None
         llm_backend, model_name = _get_model_metadata()
+        params = {
+            "column_filters": dict(req.column_filters),
+            **llm_provider.get_run_parameters(),
+        }
         record = {
             "doc_id": doc_oid,
             "pipeline": "llm_semantic",
             "llm_backend": llm_backend,
             "model_name": model_name,
             "research_question": req.research_question,
-            "params": {"column_filters": dict(req.column_filters)},
+            "params": params,
             "batch_label": _parse_batch_label(survey_name, doc_oid),
             "started_at": started_at,
             "status": "running",
