@@ -22,3 +22,4 @@ numpy==1.26.4
 # HTTP (for LLM calls)
 httpx==0.27.0
 anthropic==0.28.0
+openai==2.38.0

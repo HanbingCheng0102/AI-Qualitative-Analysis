@@ -31,14 +31,22 @@ python -m spacy download en_core_web_sm
 ```
 
 ### 5. Configure environment
-```bash
-cp .env.example .env
-```
-Edit `.env` and fill in:
-- `MONGO_URI` — your Atlas connection string (same one used by the NIE api-server)
-- `MONGO_DB_NAME` — database name (default: `nie`)
-- `LLM_BACKEND` — `openai` or `ollama`
-- `OPENAI_API_KEY` — if using OpenAI
+
+Create or edit the repository-root `.env` file. It is excluded from Git.
+
+Required shared settings:
+- `MONGO_URI` - MongoDB connection string
+- `MONGO_DB_NAME` - database name (default: `nie`)
+- `LLM_BACKEND` - `anthropic`, `azure`, `openai`, or `ollama`
+- `LLM_TIMEOUT_SECONDS` - request timeout recorded in `pipelineRuns.params`
+
+For Azure Foundry v1:
+- `AZURE_OPENAI_BASE_URL` - the base URL ending in `/openai/v1/`, not the
+  complete `/chat/completions` URL
+- `AZURE_OPENAI_MODEL` - the deployment name used in API requests
+- `AZURE_OPENAI_API_KEY` - keep this only in `.env`; never commit it
+- `AZURE_OPENAI_MODEL_VERSION` - the version shown by the deployment
+- `AZURE_OPENAI_DEPLOYMENT_TYPE` - the deployment type shown by Foundry
 
 ### 6. Run the service
 ```bash

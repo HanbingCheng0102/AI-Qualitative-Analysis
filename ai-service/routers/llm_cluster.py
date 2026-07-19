@@ -31,7 +31,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from services import experiment_config, llm_clusterer
+from services import experiment_config, llm_clusterer, llm_provider
 from services.mongo_client import get_db
 
 router = APIRouter()
@@ -69,18 +69,7 @@ def _event(obj: dict) -> str:
 
 
 def _get_model_metadata() -> tuple[str, str]:
-    configured_backend = str(llm_clusterer.LLM_BACKEND)
-    if configured_backend == "anthropic":
-        backend = "anthropic"
-        model_name = llm_clusterer.ANTHROPIC_MODEL
-    elif configured_backend == "ollama":
-        backend = "ollama"
-        model_name = llm_clusterer.OLLAMA_MODEL
-    elif configured_backend == "openai":
-        backend = "openai"
-        model_name = llm_clusterer.OPENAI_MODEL
-    else:
-        raise RuntimeError(f"Unsupported LLM_BACKEND={configured_backend!r}.")
+    backend, model_name = llm_provider.get_model_metadata()
 
     if not model_name:
         logger.warning(
@@ -94,7 +83,7 @@ def _get_model_metadata() -> tuple[str, str]:
 def _safe_failure_message(exc: Exception) -> str:
     message = " ".join(str(exc).split()) or exc.__class__.__name__
     message = re.sub(r"(?i)\bBearer\s+\S+", "Bearer [REDACTED]", message)
-    for secret in (llm_clusterer.ANTHROPIC_KEY, llm_clusterer.OPENAI_KEY):
+    for secret in llm_provider.get_sensitive_values():
         if secret:
             message = message.replace(secret, "[REDACTED]")
     return message[:500]
@@ -166,13 +155,17 @@ def _start_pipeline_run(
         document = db["documents"].find_one({"_id": doc_oid}, {"name": 1})
         survey_name = document.get("name") if document else None
         llm_backend, model_name = _get_model_metadata()
+        params = {
+            "column_filters": dict(req.column_filters),
+            **llm_provider.get_run_parameters(),
+        }
         record = {
             "doc_id": doc_oid,
             "pipeline": "llm_semantic",
             "llm_backend": llm_backend,
             "model_name": model_name,
             "research_question": req.research_question,
-            "params": {"column_filters": dict(req.column_filters)},
+            "params": params,
             "batch_label": _parse_batch_label(survey_name, doc_oid),
             "started_at": started_at,
             "status": "running",
@@ -547,7 +540,7 @@ def llm_cluster_run(req: LLMClusterRequest):
 
     try:
         experiment_config.validate_active_backend_configuration(
-            llm_clusterer.LLM_BACKEND,
+            experiment_config.LLM_BACKEND,
             strict_mode,
         )
     except Exception as exc:
