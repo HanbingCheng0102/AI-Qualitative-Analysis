@@ -9,7 +9,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 ### 1.1 实验准入
 
 - 已获得 FEC 最终批准。
-- 已获得 COMP2300 教学材料的数据使用许可。
+- `COMP2300` 教学材料许可状态：导师已在 2026-07-10 例会中口头同意本项目使用；书面确认邮件已发送，当前等待回复。该口头许可仅已用于一次脱敏性健康 Azure smoke test；正式 9 个 doc 生成必须等书面回复到位后方可开始。
 - 已确定本实验使用的最终模型。
 - 确认 participant information sheet 已发送、consent form 已签署、录音设备已就绪。
 - 确认 participant、task、batch 和 doc ID 已按分配表固定。
@@ -266,6 +266,8 @@ VERIFY_REL_2
 - 启用 `FREEZE_LABELS` 时，`/cluster/run`、`/label/clusters`、`/suggest/save` 在任何数据库写入前返回 `423 Locked` 和 `labels_frozen`；`/llm-cluster/run` 不受 freeze 阻塞，其生成结果进入正式实验仍由 strict mode 与正式 doc ID whitelist 共同门禁。
 - Strict experiment mode 已实现并验证（commit `f7421cf`，2026-07-18）；正式文档生成必须使用该模式，使 LLM 请求失败或无效响应显式终止 run，不写入 heuristic fallback 聚类结果。
 - Assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID 并约束 `assign` 只能从中选择；三个模型统一使用该版本。正式 9 个 doc 生成前不得再修改 prompt；若必须修改，改动前生成的所有正式候选 run 均作废并重新生成。
+- Azure/Mistral backend 已通过共享 provider 接入并完成技术验证（共享层 commit `936fdda`，Azure 实现 commit `434efe1`，验证记录 `docs/verification_records/azure_mistral.md`）。已验证 `Mistral-Large-3` deployment version `1`、`GlobalStandard`、60 秒 timeout、零隐藏重试、active-backend-only 配置校验、Ollama 离线隔离、缺 key fail-loud 及 content-filter 失败语义。
+- 性健康 smoke test 仅运行一次并以 `status: "completed"` 终局结束（结果 commit `da5a49a`），未触发 content filter。该单行测试只覆盖 relevance 与首簇创建分支，不能视为多片段 assignment 或正式批次验证；正式生成仍受 COMP2300 书面许可、最终模型选择、sampling 参数冻结、clean worktree 与正式 doc ID whitelist 门禁。
 
 ## 7. 变更记录
 
@@ -275,3 +277,4 @@ VERIFY_REL_2
 | 2026-07-18 | 更正 ERGO 状态；补充伦理程序、participant 排除名单审计及正式 doc ID whitelist。 |
 | 2026-07-18 | 记录 strict mode 验证结果、completed run 分析规则、中断 run 排除规则及 assignment prompt 冻结政策。 |
 | 2026-07-19 | 记录 `FREEZE_LABELS` 全局改写守卫、recluster 冻结行为、423 拒绝边界及与 strict mode 的正交关系。 |
+| 2026-07-19 | 记录 COMP2300 口头许可与待回书面确认状态；记录 Azure/Mistral 技术验证、性健康单行 smoke test 结果及其覆盖边界。 |
