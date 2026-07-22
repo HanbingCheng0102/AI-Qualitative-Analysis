@@ -9,7 +9,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 ### 1.1 实验准入
 
 - 已获得 FEC 最终批准。
-- `COMP2300` 教学材料许可状态：导师已在 2026-07-10 例会中口头同意本项目使用；书面确认邮件已发送，当前等待回复。该口头许可仅已用于一次脱敏性健康 Azure smoke test；正式 9 个 doc 生成必须等书面回复到位后方可开始。
+- `COMP2300` 教学材料许可状态：导师已在 2026-07-10 例会中口头同意本项目使用；书面确认已收到（截至 2026-07-22）。该材料现可用于阶段 D 正式文档生成；源文件与派生 CSV 仍须保持本地、不得进入 Git。
 - 已确定本实验使用的最终模型。
 - 确认 participant information sheet 已发送、consent form 已签署、录音设备已就绪。
 - 确认 participant、task、batch 和 doc ID 已按分配表固定。
@@ -271,7 +271,7 @@ VERIFY_REL_2
 - Assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID 并约束 `assign` 只能从中选择；三个模型统一使用该版本。正式 9 个 doc 生成前不得再修改 prompt；若必须修改，改动前生成的所有正式候选 run 均作废并重新生成。
 - Sampling 参数已实现并验证（commit `2567fc3`，2026-07-19；验证记录 `docs/verification_records/sampling_freeze.md`）。三个模型统一请求 `temperature=0`、`seed=42`、`max_tokens=1024` 与 60 秒 timeout，SDK 隐藏重试保持为零；Azure seed 的 best-effort 语义单独记入 `pipelineRuns.params.seed_semantics`。Prompt 与 sampling 参数共同构成冻结的实验仪器；正式生成开始后若必须修改任一项，旧仪器下的全部正式候选 run 均作废并重新生成，且所有尝试记录保留。
 - Azure/Mistral backend 已通过共享 provider 接入并完成技术验证（共享层 commit `936fdda`，Azure 实现 commit `434efe1`，验证记录 `docs/verification_records/azure_mistral.md`）。已验证 `Mistral-Large-3` deployment version `1`、`GlobalStandard`、60 秒 timeout、零隐藏重试、active-backend-only 配置校验、Ollama 离线隔离、缺 key fail-loud 及 content-filter 失败语义。
-- 性健康 smoke test 仅运行一次并以 `status: "completed"` 终局结束（结果 commit `da5a49a`），未触发 content filter。该单行测试只覆盖 relevance 与首簇创建分支，不能视为多片段 assignment 或正式批次验证；正式生成仍受 COMP2300 书面许可、最终模型选择、clean worktree 与正式 doc ID whitelist 门禁。
+- 性健康 smoke test 仅运行一次并以 `status: "completed"` 终局结束（结果 commit `da5a49a`），未触发 content filter。该单行测试只覆盖 relevance 与首簇创建分支，不能视为多片段 assignment 或正式批次验证；正式生成仍受最终模型选择、clean worktree 与正式 doc ID whitelist 门禁。
 
 ## 7. 变更记录
 
@@ -283,3 +283,4 @@ VERIFY_REL_2
 | 2026-07-19 | 记录 `FREEZE_LABELS` 全局改写守卫、recluster 冻结行为、423 拒绝边界及与 strict mode 的正交关系。 |
 | 2026-07-19 | 记录 COMP2300 口头许可与待回书面确认状态；记录 Azure/Mistral 技术验证、性健康单行 smoke test 结果及其覆盖边界。 |
 | 2026-07-19 | 冻结 `temperature=0`、`seed=42`、`max_tokens=1024` 与 60 秒 timeout；记录 Azure/Ollama 真实 20 行验证、provider seed 语义和 prompt+sampling 联合冻结政策。 |
+| 2026-07-22 | 记录 COMP2300 书面许可已收到；解除阶段 D 正式文档生成的数据许可阻塞，保留源文件与派生 CSV 不进入 Git 的约束。 |
