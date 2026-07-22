@@ -42,9 +42,13 @@ prompt、research question、CSV 字节内容和 sampling 参数。
 
 | Batch | 本地 CSV 绝对路径 | 主题/来源范围 | 行数 | Research question（逐字一致） | SHA-256 |
 | --- | --- | --- | --- | --- | --- |
-| A | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| B | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| C | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
+| A | `D:\6003\thematic_clusters_git\test-data\private\formal\batch_A.csv` | COMP2300 sexual-health transcript P1；只含 participant answers，排除 interviewer prompts 与 demographics | 17 | `factors influencing access to and experience of sexual-health services` | `d631c56d573537057a8005ac26d94bd799b414fff30695b8decf85f0182972ea` |
+| B | `D:\6003\thematic_clusters_git\test-data\private\formal\batch_B.csv` | COMP2300 sexual-health transcript P2；只含 participant answers，排除 interviewer prompts 与 demographics | 21 | `factors influencing access to and experience of sexual-health services` | `58d8b85f1c4f1442aa3800673ab89a3ef3998b3ecc51d295636eec96dfeb327c` |
+| C | `D:\6003\thematic_clusters_git\test-data\private\formal\batch_C.csv` | COMP2300 sexual-health transcript P3；只含 participant answers，排除 interviewer prompts 与 demographics | 20 | `factors influencing access to and experience of sexual-health services` | `3d6d2032e244b1031ad32426a5880c059aa4312f9775225e766c77eab62f918e` |
+
+三份 CSV 的列结构均为 `respondent_id,Experience`；已按 Survey Ingestion 的
+列预览逻辑确认，均只显示非 metadata 列 `Experience`。后端 ingestion 解析得到的
+fragment 数分别为 17、21、20，与 manifest 行数一致。
 
 计算哈希：
 
@@ -54,7 +58,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath "CSV_ABSOLUTE_PATH"
 
 Manifest 验收条件：
 
-- 三行没有 `TBD`。
+- 三行所有字段均已填写。
 - CSV 不被 `git status --short` 列出，且不在 `git ls-files` 中。
 - 每个 Batch 的列结构已在 Survey Ingestion 预览中确认。
 - 同一 Batch 的三个模型运行使用完全相同的 SHA-256。
