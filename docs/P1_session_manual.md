@@ -10,7 +10,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 
 - 已获得 FEC 最终批准。
 - `COMP2300` 教学材料许可状态：导师已在 2026-07-10 例会中口头同意本项目使用；书面确认已收到（截至 2026-07-22）。该材料现可用于阶段 D 正式文档生成；源文件与派生 CSV 仍须保持本地、不得进入 Git。
-- 已确定本实验使用的最终模型。
+- 已确定最终模型：本地 `llama3.2:3b` 与 `qwen2.5:3b`，云端 Azure `Mistral-Large-3`（deployment version `1`、`GlobalStandard`）。
 - 确认 participant information sheet 已发送、consent form 已签署、录音设备已就绪。
 - 确认 participant、task、batch 和 doc ID 已按分配表固定。
 - 确认该 doc 的 `pipelineRuns` 记录包含 `finished_at`。
@@ -65,7 +65,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 
 - 查看仓库根目录 `.env`，目视核对 `LLM_BACKEND` 与对应 model name。
 - Azure 运行必须核对 `AZURE_OPENAI_BASE_URL` 以 `/openai/v1/` 结尾、`AZURE_OPENAI_API_KEY` 已配置、`AZURE_OPENAI_MODEL=Mistral-Large-3`、`AZURE_OPENAI_MODEL_VERSION=1`、`AZURE_OPENAI_DEPLOYMENT_TYPE=GlobalStandard`；密钥不得写入手册、日志或 Git。
-- Ollama 运行必须核对 `OLLAMA_BASE_URL=http://localhost:11434` 与本场批准的 `OLLAMA_MODEL`，并确认 `/api/tags` 可访问。
+- Ollama 运行必须核对 `OLLAMA_BASE_URL=http://localhost:11434` 与本场批准的 `OLLAMA_MODEL`，确认 `/api/tags` 可访问，并核对完整 digest：`llama3.2:3b` 为 `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`，`qwen2.5:3b` 为 `357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b`。
 - 正式文档生成与正式 session 均必须设置 `LLM_STRICT_MODE=true` 和 `FREEZE_LABELS=true`；两个开关语义正交，可长期同时启用。
 - 正式文档生成必须设置 `LLM_TIMEOUT_SECONDS=60`、`LLM_TEMPERATURE=0`、`LLM_SEED=42`、`LLM_MAX_TOKENS=1024`。Azure 的 seed 为 best-effort，不宣称逐位可复现；Ollama 将 `LLM_MAX_TOKENS` 映射为 `num_predict`。
 - 两个开关均在 AI service 启动时读取；修改 `.env` 后必须完整重启 AI service，不能依赖热更新。
@@ -270,6 +270,7 @@ VERIFY_REL_2
 - Strict experiment mode 已实现并验证（commit `f7421cf`，2026-07-18）；正式文档生成必须使用该模式，使 LLM 请求失败或无效响应显式终止 run，不写入 heuristic fallback 聚类结果。
 - Assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID 并约束 `assign` 只能从中选择；三个模型统一使用该版本。正式 9 个 doc 生成前不得再修改 prompt；若必须修改，改动前生成的所有正式候选 run 均作废并重新生成。
 - Sampling 参数已实现并验证（commit `2567fc3`，2026-07-19；验证记录 `docs/verification_records/sampling_freeze.md`）。三个模型统一请求 `temperature=0`、`seed=42`、`max_tokens=1024` 与 60 秒 timeout，SDK 隐藏重试保持为零；Azure seed 的 best-effort 语义单独记入 `pipelineRuns.params.seed_semantics`。Prompt 与 sampling 参数共同构成冻结的实验仪器；正式生成开始后若必须修改任一项，旧仪器下的全部正式候选 run 均作废并重新生成，且所有尝试记录保留。
+- 本地模型选择已验证并留档于 `docs/verification_records/local_model_selection.md`。候选 `qwen2.5:7b` 在唯一一次 20 行门禁运行的首个 relevance 调用中触发 `ReadTimeout`，strict run 失败且零簇落库；未重试、未放宽 60 秒共同 timeout。预定义回退 `qwen2.5:3b` 在相同配置下唯一一次完成，因此最终本地模型固定为 `llama3.2:3b + qwen2.5:3b`。
 - Azure/Mistral backend 已通过共享 provider 接入并完成技术验证（共享层 commit `936fdda`，Azure 实现 commit `434efe1`，验证记录 `docs/verification_records/azure_mistral.md`）。已验证 `Mistral-Large-3` deployment version `1`、`GlobalStandard`、60 秒 timeout、零隐藏重试、active-backend-only 配置校验、Ollama 离线隔离、缺 key fail-loud 及 content-filter 失败语义。
 - 性健康 smoke test 仅运行一次并以 `status: "completed"` 终局结束（结果 commit `da5a49a`），未触发 content filter。该单行测试只覆盖 relevance 与首簇创建分支，不能视为多片段 assignment 或正式批次验证；正式生成仍受最终模型选择、clean worktree 与正式 doc ID whitelist 门禁。
 
@@ -284,3 +285,4 @@ VERIFY_REL_2
 | 2026-07-19 | 记录 COMP2300 口头许可与待回书面确认状态；记录 Azure/Mistral 技术验证、性健康单行 smoke test 结果及其覆盖边界。 |
 | 2026-07-19 | 冻结 `temperature=0`、`seed=42`、`max_tokens=1024` 与 60 秒 timeout；记录 Azure/Ollama 真实 20 行验证、provider seed 语义和 prompt+sampling 联合冻结政策。 |
 | 2026-07-22 | 记录 COMP2300 书面许可已收到；解除阶段 D 正式文档生成的数据许可阻塞，保留源文件与派生 CSV 不进入 Git 的约束。 |
+| 2026-07-22 | 根据预注册门禁结果固定本地模型为 `llama3.2:3b + qwen2.5:3b`；记录 `qwen2.5:7b` 的 60 秒超时淘汰、3B 回退通过及完整 Ollama digest。 |
