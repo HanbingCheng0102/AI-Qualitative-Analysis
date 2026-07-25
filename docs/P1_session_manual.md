@@ -72,7 +72,7 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 - 在每场生成与 session 记录中写明实际 backend、model、`FREEZE_LABELS` 与四项 sampling/timeout 值，并目视核对其与批准配置一致。
 - 运行 `git status --short`；正式 session 要求无输出，即 clean worktree。
 - 正式生成前建立 annotated tag `generation-frozen-G`；九条正式 `pipelineRuns.code_version` 必须全部等于该 tag 指向的完整 hash `G`。
-- 九个 doc ID 填入 whitelist 后，只允许提交 `docs/` 变更，得到 session 操作版本 `S`。Session 前运行 `git diff --exit-code generation-frozen-G..HEAD -- . ':(exclude)docs'`，必须无输出；再复核 prompt hash。`S` 不要求与 `G` hash 相等，但除 `docs/` 外必须与 `G` 等价。
+- 九个 doc ID、smoke 排除 doc ID 与全部生成台账填满后，只允许提交一次 `docs/` 变更，得到 session 操作版本 `S`。在 `S` 上以 `S` full hash 为端点运行非 docs diff 与 prompt hash 复核。随后只允许恰好一个 message 为 `docs: audit record for S` 的 docs-only audit commit，记录 `S` full hash 和已得到的验证结果，不得改变任何操作性内容。正式 session 固定 checkout 到该 audit commit；`S` 与 audit commit 除 `docs/` 外都必须与 `G` 等价。
 
 #### 版本凭据（阶段 D 填写）
 
@@ -83,7 +83,17 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 | Generation date | `TBD` |
 | Session operation `S` full hash | `TBD` |
 | `G → S` 非 docs diff | `TBD` |
+| `S` prompt hash 复核 | `TBD` |
+| Audit commit | `S` 后恰好一个；message `docs: audit record for S` |
+| Session checkout endpoint | 上述唯一 audit commit |
+| Session 前 `G → audit` 非 docs diff | `TBD` |
+| Session 前 `S → audit` 非 docs diff | `TBD` |
 | Session 前 prompt hash 复核 | `TBD` |
+
+三层关系固定为 `G`（annotated tag）→ `S`（whitelist/台账 commit）→
+唯一 audit commit。Audit commit 不自指记录自己的 hash；其身份由
+`provenance-extension` 的 `HEAD`、固定 commit message 及 parent=`S` 共同
+核对。
 
 若建立 `G` 后发现代码缺陷，不得在 `G → S` 间直接修补。必须二选一并留档：保持 `G` 完成实验并把缺陷写入 limitation；或修复后废止当前正式候选文档、建立新 generation tag 并重新生成全部九个文档。不得混用两个仪器版本。
 
@@ -261,6 +271,26 @@ VERIFY_REL_2
 
 后续新增任何开发、Swagger 或恢复测试身份，必须先登记在此名单，再产生测试数据。
 
+### 4.4 开发与 smoke 文档排除名单
+
+以下文档真实存在于 `documents` 与 `pipelineRuns`，但绝不进入正式 doc ID
+whitelist，也绝不进入分析。阶段 D 每个 smoke 完成或失败后立即登记其
+`doc_id`；正式分析开始前任一空缺都必须先对账。
+
+| Survey name | 用途 | doc_id（阶段 D 登记） |
+| --- | --- | --- |
+| `D_SMOKE_LLAMA_batchA` | Llama 20 行配置/provider smoke | |
+| `D_SMOKE_QWEN_batchA` | Qwen 20 行配置/provider smoke | |
+| `D_SMOKE_AZURE_batchA` | Azure deployment 存活及 20 行 provider smoke | |
+
+所有分析脚本必须同时实施两道 document 门禁：
+
+1. `doc_id` 必须位于第 1.1 节正式 whitelist；
+2. `doc_id` 不得位于本节开发/smoke 排除名单。
+
+两份名单未填满或发生交集时必须 fail closed，禁止运行正式分析。只依赖
+survey name、participant 排除名单或其中任一 document 名单都不合格。
+
 ## 5. 分析约定
 
 - 正式分析前必须先在 mongosh 运行：
@@ -278,7 +308,7 @@ VERIFY_REL_2
 - `pipelineRuns.doc_id` 与 `clusterFeedback.doc_id` 必须同为 BSON `ObjectId` 后再 join。
 - 只有满足 `{status: "completed", finished_at: {$exists: true}}`、backend/model 与正式条件一致、`params.temperature=0`、`params.seed=42`、`params.max_tokens=1024`、`params.timeout_seconds=60`，且 `code_version` 属批准 commit 的 run 才能进入实验。
 - 遗留 `status: "running"` 的非当前 run 视为进程中断并作废；没有 `status` 字段的旧 P1 run 属开发数据，一律排除。
-- 正式分析同时使用 participant 排除名单与正式 doc ID whitelist；不能只依赖 survey name。
+- 正式分析同时使用 participant 排除名单、正式 doc ID whitelist 与第 4.4 节开发/smoke doc ID 排除名单；必须执行“在 whitelist 且不在 smoke 排除名单”的 document 双门禁，不能只依赖 survey name。
 - 模型间 cluster 粒度、过滤数量和实际审查数量的差异保留为结果，不通过删除记录强行等量化。
 
 ## 6. 已知边界与历史包装
@@ -309,3 +339,4 @@ VERIFY_REL_2
 | 2026-07-22 | 记录 COMP2300 书面许可已收到；解除阶段 D 正式文档生成的数据许可阻塞，保留源文件与派生 CSV 不进入 Git 的约束。 |
 | 2026-07-22 | 根据预注册门禁结果固定本地模型为 `llama3.2:3b + qwen2.5:3b`；记录 `qwen2.5:7b` 的 60 秒超时淘汰、3B 回退通过及完整 Ollama digest。 |
 | 2026-07-22 | 固定九文档正交拉丁方、single-blind 操作定义、按模型分组生成顺序，以及 generation `G` / session `S` 双版本凭据与非 docs 等价性证明。 |
+| 2026-07-25 | 在 `G` 前固定 20 行 smoke 输入、smoke 文档排除双门禁、Ollama digest 与 Azure deployment 存活检查、人工批准的 `_attemptN` 失败协议，以及 `G → S → audit commit` 三层版本结构。 |
