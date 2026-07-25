@@ -84,14 +84,16 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 | Session operation `S` full hash | `TBD` |
 | `G → S` 非 docs diff | `TBD` |
 | `S` prompt hash 复核 | `TBD` |
+| Post-`G` API orchestration record | 恰好一个 docs-only commit；message `docs: record Stage D API orchestration gate` |
 | Audit commit | `S` 后恰好一个；message `docs: audit record for S` |
 | Session checkout endpoint | 上述唯一 audit commit |
 | Session 前 `G → audit` 非 docs diff | `TBD` |
 | Session 前 `S → audit` 非 docs diff | `TBD` |
 | Session 前 prompt hash 复核 | `TBD` |
 
-三层关系固定为 `G`（annotated tag）→ `S`（whitelist/台账 commit）→
-唯一 audit commit。Audit commit 不自指记录自己的 hash；其身份由
+版本层仍固定为 `G`（annotated tag）→ `S`（whitelist/台账 commit）→
+唯一 audit commit；获批的 API orchestration docs commit 只是 `G → S`
+之间的事故与门禁记录，不构成新版本层。Audit commit 不自指记录自己的 hash；其身份由
 `provenance-extension` 的 `HEAD`、固定 commit message 及 parent=`S` 共同
 核对。
 
@@ -279,9 +281,11 @@ whitelist，也绝不进入分析。阶段 D 每个 smoke 完成或失败后立�
 
 | Survey name | 用途 | doc_id（阶段 D 登记） |
 | --- | --- | --- |
-| `D_SMOKE_LLAMA_batchA` | Llama 20 行配置/provider smoke | |
+| `D_SMOKE_LLAMA_batchA` | Llama smoke attempt 1；编排失败，provider 未调用 | `6a64c2e83e0dbddf5447c741` |
+| `D_SMOKE_LLAMA_batchA_attempt2` | Llama 20 行配置/provider smoke；已批准 retry | |
 | `D_SMOKE_QWEN_batchA` | Qwen 20 行配置/provider smoke | |
 | `D_SMOKE_AZURE_batchA` | Azure deployment 存活及 20 行 provider smoke | |
+| `P1_task2_batchB` | 2026-07-16 历史开发文档；与未来 Azure 正式文档同名 | `6a58d2cd1d6d1e80c35ba564` |
 
 所有分析脚本必须同时实施两道 document 门禁：
 
@@ -290,6 +294,11 @@ whitelist，也绝不进入分析。阶段 D 每个 smoke 完成或失败后立�
 
 两份名单未填满或发生交集时必须 fail closed，禁止运行正式分析。只依赖
 survey name、participant 排除名单或其中任一 document 名单都不合格。
+
+同名碰撞的具体审计案例为 `P1_task2_batchB`：历史开发 doc ID
+`6a58d2cd1d6d1e80c35ba564` 必须始终被排除；未来 Azure 正式生成返回的新
+doc ID 必须与它不同，且只有新 doc ID 可以进入正式 whitelist。任何按
+survey name join、取第一条或取最新一条的做法都不合格。
 
 ## 5. 分析约定
 
@@ -308,7 +317,7 @@ survey name、participant 排除名单或其中任一 document 名单都不合�
 - `pipelineRuns.doc_id` 与 `clusterFeedback.doc_id` 必须同为 BSON `ObjectId` 后再 join。
 - 只有满足 `{status: "completed", finished_at: {$exists: true}}`、backend/model 与正式条件一致、`params.temperature=0`、`params.seed=42`、`params.max_tokens=1024`、`params.timeout_seconds=60`，且 `code_version` 属批准 commit 的 run 才能进入实验。
 - 遗留 `status: "running"` 的非当前 run 视为进程中断并作废；没有 `status` 字段的旧 P1 run 属开发数据，一律排除。
-- 正式分析同时使用 participant 排除名单、正式 doc ID whitelist 与第 4.4 节开发/smoke doc ID 排除名单；必须执行“在 whitelist 且不在 smoke 排除名单”的 document 双门禁，不能只依赖 survey name。
+- 正式分析同时使用 participant 排除名单、正式 doc ID whitelist 与第 4.4 节开发/smoke doc ID 排除名单；必须执行“在 whitelist 且不在 smoke 排除名单”的 document 双门禁，不能只依赖 survey name。`P1_task2_batchB` 的历史/正式同名碰撞必须按两个不同 BSON `ObjectId` 处理，禁止按名称 join。
 - 模型间 cluster 粒度、过滤数量和实际审查数量的差异保留为结果，不通过删除记录强行等量化。
 
 ## 6. 已知边界与历史包装
@@ -340,3 +349,4 @@ survey name、participant 排除名单或其中任一 document 名单都不合�
 | 2026-07-22 | 根据预注册门禁结果固定本地模型为 `llama3.2:3b + qwen2.5:3b`；记录 `qwen2.5:7b` 的 60 秒超时淘汰、3B 回退通过及完整 Ollama digest。 |
 | 2026-07-22 | 固定九文档正交拉丁方、single-blind 操作定义、按模型分组生成顺序，以及 generation `G` / session `S` 双版本凭据与非 docs 等价性证明。 |
 | 2026-07-25 | 在 `G` 前固定 20 行 smoke 输入、smoke 文档排除双门禁、Ollama digest 与 Azure deployment 存活检查、人工批准的 `_attemptN` 失败协议，以及 `G → S → audit commit` 三层版本结构。 |
+| 2026-07-25 | 记录首次 Llama smoke 的 `NO_EMBEDDED_FRAGMENTS` 编排失败；固定底层 API 的 `ingest → embed → LLM` 全量计数门禁，并登记历史 `P1_task2_batchB` 同名开发 doc ID 与分析排除规则。 |

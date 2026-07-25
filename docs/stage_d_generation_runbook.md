@@ -157,11 +157,12 @@ Tag 建立后，除非阶段 D 整体重置，不得移动或重建该 tag。
 分支可完成及 metadata 可追溯，不是正式比较数据。名称中的 `batchA` 只是
 开发文档命名与 `batch_label` 解析需要；输入并非正式 Batch A。
 
-| Smoke survey name | Expected backend/model | doc_id（生成后登记） |
-| --- | --- | --- |
-| `D_SMOKE_LLAMA_batchA` | `ollama` / `llama3.2:3b` | |
-| `D_SMOKE_QWEN_batchA` | `ollama` / `qwen2.5:3b` | |
-| `D_SMOKE_AZURE_batchA` | `azure` / `Mistral-Large-3` | |
+| Smoke survey name | Expected backend/model | doc_id | run_id | outcome |
+| --- | --- | --- | --- | --- |
+| `D_SMOKE_LLAMA_batchA` | `ollama` / `llama3.2:3b` | `6a64c2e83e0dbddf5447c741` | `6a64c2e93e0dbddf5447c756` | `failed`；`NO_EMBEDDED_FRAGMENTS` at `load_fragments`；provider 未调用 |
+| `D_SMOKE_LLAMA_batchA_attempt2` | `ollama` / `llama3.2:3b` | | | 2026-07-25 已批准；待执行 |
+| `D_SMOKE_QWEN_batchA` | `ollama` / `qwen2.5:3b` | | | 待执行 |
+| `D_SMOKE_AZURE_batchA` | `azure` / `Mistral-Large-3` | | | 待执行 |
 
 任一 smoke 失败：停止该模型块，不生成其正式文档，不立即重试。
 
@@ -224,20 +225,48 @@ deployment-side preflight failure：停止本块、保留记录并先报告，�
 误判为代码或正式数据失败，也不得立即重试。Smoke completed 且 metadata
 核对通过后，按顺序生成：
 
-1. `P1_task2_batchB`，使用 Batch B manifest。
+1. `P1_task2_batchB`，使用 Batch B manifest。数据库已有同名历史开发文档
+   `6a58d2cd1d6d1e80c35ba564`；新 ingest 返回的 `doc_id` 必须与它不同，
+   后续所有调用只使用新返回的 `doc_id`，正式 whitelist 也只收新 `doc_id`。
 2. `P2_task3_batchA`，使用 Batch A manifest。
 3. `P3_task1_batchC`，使用 Batch C manifest。
 
 ## 7. 单个正式文档操作与验收
 
-每个文档只进行一次初始尝试：
+### 7.1 固定 API 编排
 
-1. 上传矩阵指定 Batch 的 manifest CSV。
-2. Survey name 必须逐字等于矩阵值，不含模型名。
-3. Research question 必须从 manifest 复制，不临场改写。
-4. 选择 `LLM Semantic` 并运行。
-5. 成功或失败都先记录结果，不删除 document、run 或 cluster 数据。
-6. 在开始下一个文档前完成本节验收。
+阶段 D 使用本地 API 批量生成，不依赖 UI 点击。UI 会隐式执行
+`ingest → embed → LLM Semantic`；底层 API 不会自动补齐下一步，因此每个
+smoke 和正式文档必须显式、按顺序执行以下完整调用链，不得跳步：
+
+1. 重新计算即将上传的 CSV SHA-256：
+   - smoke 必须匹配第 5 节的 20 行 hash；
+   - 正式文档必须匹配第 2 节对应 Batch hash。
+2. 生成前确认 `git status --short` 无输出、`git rev-parse HEAD` 等于 `G`，
+   并核对本模型块的有效配置。
+3. `POST /ingest/survey`：
+   - file 为本次已核对 hash 的 CSV；
+   - `survey_name` 必须逐字等于矩阵值或已批准的 `_attemptN` 值；
+   - 保存响应直接返回的 `doc_id`，此后不得按 survey name 反查或选择文档；
+   - `fragment_count` 必须等于 smoke 20 或 manifest 的 A=17、B=21、C=20；
+     不等则停止，不调用 embed。
+4. `POST /embed/fragments`，请求体只使用上一步返回的 `doc_id`：
+   - 响应 `embedded_count` 必须等于该文档完整 fragment 数；
+   - MongoDB 中该 `doc_id` 的非空 embedding 数也必须等于完整 fragment 数；
+   - smoke 必须为 20/20；正式文档必须为 A=17/17、B=21/21、C=20/20；
+   - 任一计数不全立即停止，不调用 LLM，不在同一文档上补跑。
+5. `POST /llm-cluster/run`，仍只使用同一 `doc_id`：
+   - `research_question` 必须从 manifest 逐字复制；
+   - `column_filters` 固定为空对象；
+   - 流式终局必须为 `done`；`error` 立即按失败协议停止。
+6. 成功或失败都先登记 document、run、各阶段计数与终局，不删除任何记录；
+   在开始下一文档前完成第 7.2 节验收。
+
+任何按名查询仅可用于碰撞审计，不能决定后续 API 的 `doc_id`。已知具体案例：
+历史开发文档 `P1_task2_batchB / 6a58d2cd1d6d1e80c35ba564` 与未来 Azure
+正式文档同名；两者只能靠 `doc_id` 区分。
+
+### 7.2 单个 run 验收
 
 在 mongosh 中核对该文档最新 run：
 
@@ -296,12 +325,19 @@ completed doc ID。
 
 | Survey name | Attempt | doc_id | run_id | status | failure count | failure stage/code/type | decision |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 生成后逐行添加 |  |  |  |  |  |  |  |
+| `D_SMOKE_LLAMA_batchA` | 1 | `6a64c2e83e0dbddf5447c741` | `6a64c2e93e0dbddf5447c756` | `failed` | 1 | `load_fragments` / `NO_EMBEDDED_FRAGMENTS` / `PipelineRunAbort` | 编排遗漏；provider 未调用；记录保留；`_attempt2` 已批准 |
+| 其余尝试生成后逐行添加 |  |  |  |  |  |  |  |
 
 ## 9. S：Session 操作版本与等价性证明
 
-九文档完成前不得在 `G → S` 之间建立任何 commit。九文档全部验收后，只
-允许一次性修改 `docs/`：回填第 4 节 `G` 凭据、第 5 节 smoke doc ID、
+`G → S` 之间只允许一个已于 2026-07-25 明确批准的例外 docs-only commit，
+message 固定为 `docs: record Stage D API orchestration gate`。它只记录首次
+smoke 的编排失败、显式 `ingest → embed → LLM` 门禁及同名开发文档碰撞；
+不得修改代码、prompt、参数、模型、正式输入或矩阵，也不产生新的版本层。
+除该 commit 外，九文档完成前不得建立其他 commit。
+
+九文档全部验收后，只允许一次性修改 `docs/`：回填第 4 节 `G` 凭据、
+第 5 节其余 smoke doc ID、
 第 8 节正式与全尝试台账，以及 `docs/P1_session_manual.md` 的正式 whitelist
 和 smoke 排除名单。该 docs-only commit 定义为 `S`。
 
