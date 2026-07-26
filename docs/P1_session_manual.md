@@ -88,9 +88,9 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 | Generation instrument `G2` full hash | `544540beedb707c2be5c08fa1647107f80587c84` |
 | Generation tag | `generation-frozen-G2` |
 | Generation date | 2026-07-26 |
-| Session operation `S` full hash | 由唯一 audit commit 回填 |
-| `G2 → S` 非 docs diff | 由唯一 audit commit 记录 |
-| `S` prompt hash 复核 | 由唯一 audit commit 记录 |
+| Session operation `S` full hash | `5a70fb9e785cffd5a19d9d1501fc598923d909b7` |
+| `G2 → S` 非 docs diff | 2026-07-26；exit 0；无输出 |
+| `S` prompt hash 复核 | 2026-07-26；Ran 1 test；OK |
 | G→G2 upgrade record | `docs/verification_records/g2_instrument_upgrade.md` |
 | G2 generation record | `docs/verification_records/stage_d_g2_generation.md` |
 | Audit commit | `S` 后恰好一个；message `docs: audit record for S` |

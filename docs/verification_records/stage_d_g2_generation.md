@@ -226,8 +226,31 @@ audit-only values below; it does not change an operational rule.
 
 | Audit item | Value recorded by the audit commit |
 | --- | --- |
-| S full hash | `PENDING_AUDIT_COMMIT` |
-| Validation date | `PENDING_AUDIT_COMMIT` |
-| `git status --short` at S | `PENDING_AUDIT_COMMIT` |
-| `generation-frozen-G2..S` non-doc diff | `PENDING_AUDIT_COMMIT` |
-| G2 prompt-hash test at S | `PENDING_AUDIT_COMMIT` |
+| S full hash | `5a70fb9e785cffd5a19d9d1501fc598923d909b7` |
+| Validation date | 2026-07-26 |
+| `git status --short` at S | exit 0; stdout empty |
+| `generation-frozen-G2..S` non-doc diff | exit 0; stdout/stderr empty |
+| G2 prompt-hash test at S | exit 0; 1 test; OK |
+
+Raw `git status --short` output:
+
+```text
+<empty>
+```
+
+Raw non-doc diff output:
+
+```text
+<empty>
+```
+
+Raw prompt-hash output:
+
+```text
+test_current_prompts_match_g2_byte_hashes (tests.test_llm_provider.PromptFreezeTests.test_current_prompts_match_g2_byte_hashes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK
+```
