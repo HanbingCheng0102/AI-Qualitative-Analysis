@@ -202,3 +202,29 @@ version structure is `G2 → S → audit commit`: all nine accepted formal
 `pipelineRuns.code_version` values equal the G2 tag target; `S` is the
 whitelist/full-ledger docs commit; one subsequent docs-only
 `docs: audit record for S` commit records the S hash and equivalence results.
+
+## Post-upgrade formal closure
+
+The final immutable G2 tag points to:
+
+`544540beedb707c2be5c08fa1647107f80587c84`
+
+Formal generation completed on 2026-07-26. The three G-era Llama first
+formal attempts were 1/3 completed, with two out-of-list-ID failures. G2
+Llama completed 3/3 first formal attempts, and the complete three-model G2
+matrix completed 9/9 first formal attempts with no `failure_*` field.
+
+The original Batch B trigger case now has a bounded closure: under G, 19 kept
+fragments reached assignment before an illegal ID stopped the run; under G2,
+the first attempt on the same formal Batch B bytes completed and assigned all
+19 kept fragments. This is evidence that the upgrade solved the specific
+protocol-validity problem for which it was commissioned. It is not a claim
+that structured decoding improves model quality or prevents every future
+failure.
+
+G2 changed observed cluster granularity as anticipated. The formal profiles
+were Qwen `1/1/2`, Azure Mistral `8/11/10`, and Llama `6/7/15`. These values
+are instrument-bound session context, not model-quality scores, and no
+document was regenerated because of its cluster count. The complete matrix
+and S analysis decisions are recorded in
+`docs/verification_records/stage_d_g2_generation.md`.

@@ -130,6 +130,10 @@ JSON 一律失败。`cluster_id` 不接受字符串或数组；只接受非负 J
 payload 哈希及静默忽略限界见
 `docs/verification_records/g2_probe.md`。
 
+最终 annotated tag `generation-frozen-G2` 于 2026-07-26 建立，永久指向
+`544540beedb707c2be5c08fa1647107f80587c84`。九个正式 run 的
+`pipelineRuns.code_version` 已全部核对为该完整 hash。
+
 G2 候选只允许在 `codex/g2-structured-output` 上、工作树干净后执行：
 
 ```powershell
@@ -178,8 +182,11 @@ G2 tag target。`generation-frozen-G2` 不得移动、覆盖或重建；任何�
    - Pipeline：`LLM Semantic`
 6. 只接受 smoke 的 `status: "completed"`、`strict_mode: true`、
    `code_version` 精确等于 G2 tag target、backend/model/params 全部匹配。
-7. Smoke doc 不进入正式 whitelist；其 `doc_id` 必须立即登记到下表和
-   `docs/P1_session_manual.md` 第 4.4 节的开发/smoke 文档排除名单。
+7. Smoke doc 不进入正式 whitelist。生成冻结期间，每发 smoke 后立即把
+   document/run/验收结果写入 ignored
+   `test-data/private/g2_smoke_ledger.txt` 并制作仓库外备份；不得在九个正式
+   文档完成前修改 tracked docs。9/9 后在 operational S 中一次性回填下表与
+   `docs/P1_session_manual.md` 第 4.4 节的排除名单。
 
 20 行 smoke 只验证当前配置可启动、provider 可调用、多片段 assignment
 分支可完成及 metadata 可追溯，不是正式比较数据。名称中的 `batchA` 只是
@@ -187,9 +194,10 @@ G2 tag target。`generation-frozen-G2` 不得移动、覆盖或重建；任何�
 
 | G2 smoke survey name | Expected backend/model | doc_id | run_id | outcome |
 | --- | --- | --- | --- | --- |
-| `D_SMOKE_G2_LLAMA_batchA` | `ollama` / `llama3.2:3b` | | | 待执行 |
-| `D_SMOKE_G2_QWEN_batchA` | `ollama` / `qwen2.5:3b` | | | 待执行 |
-| `D_SMOKE_G2_AZURE_batchA` | `azure` / `Mistral-Large-3` | | | 待执行 |
+| `D_SMOKE_G2_LLAMA_batchA` | expected `ollama` / `llama3.2:3b`; actual `azure` / `Mistral-Large-3` | `6a660bdef041b5fef471e029` | `6a660be2f041b5fef471e03e` | run completed；backend mismatch；验收拒绝；环境事故 |
+| `D_SMOKE_G2_LLAMA_batchA_attempt2` | `ollama` / `llama3.2:3b` | `6a66119a59652a872b0639b2` | `6a66123e59652a872b0639c7` | 获批环境恢复重试；completed；accepted |
+| `D_SMOKE_G2_QWEN_batchA` | `ollama` / `qwen2.5:3b` | `6a661d1ec2a3cea7e6de6028` | `6a661dc2c2a3cea7e6de603d` | completed；accepted |
+| `D_SMOKE_G2_AZURE_batchA` | `azure` / `Mistral-Large-3` | `6a661f814b63e7a3c45dd144` | `6a661f844b63e7a3c45dd159` | completed；accepted |
 
 G-era smoke `D_SMOKE_LLAMA_batchA` 与
 `D_SMOKE_LLAMA_batchA_attempt2` 已永久进入开发/smoke 排除名单；G2 不复用
@@ -345,19 +353,19 @@ completed doc ID。
 
 ## 8. G2 九文档生成台账
 
-| Survey name | Expected model | Expected batch | doc_id | run_id | status | fragments | clusters | started_at | finished_at | code_version |
+| Survey name | Model | Batch | doc_id | run_id | status | fragments/embedded | kept/filtered | clusters | finished_at | code_version |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `P1_task1_batchA` | `llama3.2:3b` | A | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P2_task2_batchC` | `llama3.2:3b` | C | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P3_task3_batchB` | `llama3.2:3b` | B | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P1_task3_batchC` | `qwen2.5:3b` | C | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P2_task1_batchB` | `qwen2.5:3b` | B | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P3_task2_batchA` | `qwen2.5:3b` | A | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P1_task2_batchB` | `Mistral-Large-3` | B | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P2_task3_batchA` | `Mistral-Large-3` | A | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
-| `P3_task1_batchC` | `Mistral-Large-3` | C | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
+| `P1_task1_batchA` | `llama3.2:3b` | A | `6a6621355e9bd7a009d1b97f` | `6a66213a5e9bd7a009d1b991` | completed | 17/17 | 15/2 | 7 | `2026-07-26T15:04:07.601000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P2_task2_batchC` | `llama3.2:3b` | C | `6a662346b88c6db2d9915ac9` | `6a66234bb88c6db2d9915ade` | completed | 20/20 | 20/0 | 15 | `2026-07-26T15:13:32.846000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P3_task3_batchB` | `llama3.2:3b` | B | `6a6625e3460dababa39a9be4` | `6a6625e7460dababa39a9bfa` | completed | 21/21 | 19/2 | 6 | `2026-07-26T15:24:25.873000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P1_task3_batchC` | `qwen2.5:3b` | C | `6a662813ed5bcd0c9d8a4439` | `6a662818ed5bcd0c9d8a444e` | completed | 20/20 | 17/3 | 2 | `2026-07-26T15:33:23.828000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P2_task1_batchB` | `qwen2.5:3b` | B | `6a666d4f04fc296116b621af` | `6a666d5404fc296116b621c5` | completed | 21/21 | 16/5 | 1 | `2026-07-26T20:28:42.553000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P3_task2_batchA` | `qwen2.5:3b` | A | `6a666f0d5f60ce182f69ff12` | `6a666f125f60ce182f69ff24` | completed | 17/17 | 16/1 | 1 | `2026-07-26T20:35:58.113000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P1_task2_batchB` | `Mistral-Large-3` | B | `6a6672adaaaa46976afdb5ba` | `6a6672b1aaaa46976afdb5d0` | completed | 21/21 | 20/1 | 11 | `2026-07-26T20:49:54.237000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P2_task3_batchA` | `Mistral-Large-3` | A | `6a667375aaaa46976afdb5dc` | `6a667376aaaa46976afdb5ee` | completed | 17/17 | 16/1 | 8 | `2026-07-26T20:52:46.838000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
+| `P3_task1_batchC` | `Mistral-Large-3` | C | `6a6673f2aaaa46976afdb5f7` | `6a6673f3aaaa46976afdb60c` | completed | 20/20 | 19/1 | 10 | `2026-07-26T20:55:01.170000Z` | `544540beedb707c2be5c08fa1647107f80587c84` |
 
-九行全部通过后，才把九个正式 `doc_id` 抄入
+九行已全部通过矩阵级只读复核；九个正式 `doc_id` 与对应 `run_id` 已抄入
 `docs/P1_session_manual.md` 的 whitelist。
 
 ### 8.1 全尝试与失败台账
@@ -373,15 +381,53 @@ completed doc ID。
 | `P1_task1_batchA_attempt2` | 2 | `6a64e3a53e0dbddf5447c782` | `6a64e3a63e0dbddf5447c794` | `completed` | 1 cumulative | none | G-era completed；G2 升级后 superseded；永不 whitelist |
 | `P2_task2_batchC` | 1 | `6a651c263e0dbddf5447c796` | `6a651c283e0dbddf5447c7ab` | `completed` | 0 | none | G-era completed；G2 升级后 superseded；永不 whitelist |
 | `P3_task3_batchB` | 1 | `6a651df93e0dbddf5447c7ad` | `6a651dfa3e0dbddf5447c7c3` | `failed` | 1 | `cluster_assignment` / `INVALID_LLM_RESPONSE` / out-of-list ID | 常备触发器击发；停止 G；不做 retry |
-| G2 后续尝试生成后逐行添加 |  |  |  |  |  |  |  |
+| `D_SMOKE_G2_LLAMA_batchA` | 1 | `6a660bdef041b5fef471e029` | `6a660be2f041b5fef471e03e` | `completed / rejected` | 1 acceptance incident | environment / backend mismatch；旧 Azure listener 接收请求；无 `failure_*` | 停止 smoke 阶段；保留并排除；获批环境恢复 `_attempt2` |
+| `D_SMOKE_G2_LLAMA_batchA_attempt2` | 2 | `6a66119a59652a872b0639b2` | `6a66123e59652a872b0639c7` | `completed` | 1 acceptance incident cumulative | none | accepted G2 Llama smoke；不入 whitelist |
+| `D_SMOKE_G2_QWEN_batchA` | 1 | `6a661d1ec2a3cea7e6de6028` | `6a661dc2c2a3cea7e6de603d` | `completed` | 0 | none | accepted G2 Qwen smoke；不入 whitelist |
+| `D_SMOKE_G2_AZURE_batchA` | 1 | `6a661f814b63e7a3c45dd144` | `6a661f844b63e7a3c45dd159` | `completed` | 0 | none | accepted G2 Azure smoke；不入 whitelist |
+| `P1_task1_batchA` | 1 | `6a6621355e9bd7a009d1b97f` | `6a66213a5e9bd7a009d1b991` | `completed` | 0 | none | accepted G2 formal；whitelist |
+| `P2_task2_batchC` | 1 | `6a662346b88c6db2d9915ac9` | `6a66234bb88c6db2d9915ade` | `completed` | 0 | none | accepted G2 formal；whitelist |
+| `P3_task3_batchB` | 1 | `6a6625e3460dababa39a9be4` | `6a6625e7460dababa39a9bfa` | `completed` | 0 | none | accepted G2 formal；G-era 触发数据上的升级闭环；whitelist |
+| `P1_task3_batchC` | 1 | `6a662813ed5bcd0c9d8a4439` | `6a662818ed5bcd0c9d8a444e` | `completed` | 0 | none | accepted G2 formal；whitelist |
+| `P2_task1_batchB` | 1 | `6a666d4f04fc296116b621af` | `6a666d5404fc296116b621c5` | `completed` | 0 | none | accepted G2 formal；单簇；whitelist |
+| `P3_task2_batchA` | 1 | `6a666f0d5f60ce182f69ff12` | `6a666f125f60ce182f69ff24` | `completed` | 0 | none | accepted G2 formal；单簇；whitelist |
+| `P1_task2_batchB` | 1 | `6a6672adaaaa46976afdb5ba` | `6a6672b1aaaa46976afdb5d0` | `completed` | 0 | none | accepted G2 formal；与历史同名开发 doc ID 不同；whitelist |
+| `P2_task3_batchA` | 1 | `6a667375aaaa46976afdb5dc` | `6a667376aaaa46976afdb5ee` | `completed` | 0 | none | accepted G2 formal；whitelist |
+| `P3_task1_batchC` | 1 | `6a6673f2aaaa46976afdb5f7` | `6a6673f3aaaa46976afdb60c` | `completed` | 0 | none | accepted G2 formal；whitelist |
+
+历史开发文档 `P1_task2_batchB / 6a58d2cd1d6d1e80c35ba564` 与正式 Azure
+文档同名，但始终排除。正式新 doc ID
+`6a6672adaaaa46976afdb5ba` 已验证与其不同；禁止按 survey name 选择记录。
+
+### 8.2 生成完成后的方法论边界
+
+- G→G2 是生成仪器可靠性与 provenance 流程证据，不是模型质量结果。
+- G 的三个 Llama 首次正式尝试为 `1/3 completed`；两个失败均为修复后
+  prompt 下的列表外 cluster ID。G2 Llama 为 `3/3 completed`，G2 全矩阵为
+  `9/9 completed`，全部是首次正式尝试且无 `failure_*`。
+- 未 embed 的 G smoke 是底层 API 编排事故，provider 未调用，不计作 schema
+  失败。G2 Llama 的 backend-mismatch attempt 是旧监听进程造成的运行环境
+  事故；run 虽 completed 但验收拒绝，获批 attempt2 后通过。
+- G2 正式粒度画像按模型汇总为：Qwen `1/1/2`（稳定但极粗）；
+  Azure `8/11/10`（中等且较稳定）；Llama `6/7/15`（粒度显著上升且
+  批次间波动大）。这些是仪器边界与 session 负担背景，不在生成阶段判定
+  哪个输出更好。
+- Smoke 仅为开发、配置与 provenance 证据，不进入 Results；其 relevance
+  过滤率不用于预测正式批次材料量。
+- 本研究三次正式 Azure run 未观察到 `CONTENT_FILTERED`。该陈述不得外推到
+  其他 Azure/Mistral deployment、其他输入或未来运行。
+- 完整 S 生成记录、九文档矩阵、ledger hash 与分析边界见
+  `docs/verification_records/stage_d_g2_generation.md`。
 
 ## 9. S：Session 操作版本与等价性证明
 
 G2 tag 建立后到九文档完成前不得修改代码、prompt、schema、参数、模型、
-正式输入或矩阵。三个 G2 smoke 与九个正式文档全部验收后，只允许一次性
-修改 `docs/`：回填 G2 tag 凭据、第 5 节 smoke doc ID、第 8 节正式与全尝试
-台账，以及 `docs/P1_session_manual.md` 的正式 whitelist、superseded 与
-smoke 排除名单。该 docs-only commit 定义为 `S`。
+正式输入或矩阵。该冻结期内每发 smoke/run 先写 ignored private ledger 并
+制作仓库外备份；“每发立即登记”指 private ledger，不指 tracked docs。三个
+G2 smoke 与九个正式文档全部验收后，只允许一次性修改 `docs/`：回填 G2 tag
+凭据、第 5 节 smoke doc ID、第 8 节正式与全尝试台账，以及
+`docs/P1_session_manual.md` 的正式 whitelist、superseded、smoke 排除名单、
+session 指标与 PILOT 隔离裁定。该 docs-only commit 定义为 `S`。
 
 在 `S` 上执行并记录：
 

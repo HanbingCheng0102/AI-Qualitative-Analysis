@@ -19,23 +19,27 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 
 #### 正式 doc ID whitelist 与盲测密钥（阶段 D 填写）
 
-阶段 D 生成正式实验文档后，在下表填入全部 9 个 `doc_id`。模型列只允许 researcher 查看；参与者只见 Batch 标签。表格填满并核对前，不得运行正式分析。
+阶段 D 的 9 个 G2 正式文档已经全部完成并通过矩阵级验收。只有下表中的
+九个 `doc_id` 可以进入正式分析；`run_id` 是对应的唯一获批生成记录。模型列
+只允许 researcher 查看；参与者只见 Batch 标签。任何名称相同但 ID 不同的
+文档均不因名称匹配而获得资格。
 
-| 正式 survey name | Batch | 真实模型 | doc_id |
-| --- | --- | --- | --- |
-| `P1_task1_batchA` | A | `llama3.2:3b` | |
-| `P1_task2_batchB` | B | `Mistral-Large-3` | |
-| `P1_task3_batchC` | C | `qwen2.5:3b` | |
-| `P2_task1_batchB` | B | `qwen2.5:3b` | |
-| `P2_task2_batchC` | C | `llama3.2:3b` | |
-| `P2_task3_batchA` | A | `Mistral-Large-3` | |
-| `P3_task1_batchC` | C | `Mistral-Large-3` | |
-| `P3_task2_batchA` | A | `qwen2.5:3b` | |
-| `P3_task3_batchB` | B | `llama3.2:3b` | |
+| 正式 survey name | Batch | 真实模型 | doc_id | run_id |
+| --- | --- | --- | --- | --- |
+| `P1_task1_batchA` | A | `llama3.2:3b` | `6a6621355e9bd7a009d1b97f` | `6a66213a5e9bd7a009d1b991` |
+| `P1_task2_batchB` | B | `Mistral-Large-3` | `6a6672adaaaa46976afdb5ba` | `6a6672b1aaaa46976afdb5d0` |
+| `P1_task3_batchC` | C | `qwen2.5:3b` | `6a662813ed5bcd0c9d8a4439` | `6a662818ed5bcd0c9d8a444e` |
+| `P2_task1_batchB` | B | `qwen2.5:3b` | `6a666d4f04fc296116b621af` | `6a666d5404fc296116b621c5` |
+| `P2_task2_batchC` | C | `llama3.2:3b` | `6a662346b88c6db2d9915ac9` | `6a66234bb88c6db2d9915ade` |
+| `P2_task3_batchA` | A | `Mistral-Large-3` | `6a667375aaaa46976afdb5dc` | `6a667376aaaa46976afdb5ee` |
+| `P3_task1_batchC` | C | `Mistral-Large-3` | `6a6673f2aaaa46976afdb5f7` | `6a6673f3aaaa46976afdb60c` |
+| `P3_task2_batchA` | A | `qwen2.5:3b` | `6a666f0d5f60ce182f69ff12` | `6a666f125f60ce182f69ff24` |
+| `P3_task3_batchB` | B | `llama3.2:3b` | `6a6625e3460dababa39a9be4` | `6a6625e7460dababa39a9bfa` |
 
 ### 1.2 服务启动顺序
 
-1. 确认 Ollama 可用：
+1. 生成/技术验证时确认 Ollama 可用；正式 session 不保持 Ollama 运行，按
+   第 1.3.1 节执行双重物理隔离：
 
    ```powershell
    ollama list
@@ -81,18 +85,19 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 | --- | --- |
 | Historical instrument `G` full hash | `da47d0eda734fc4136b8303a03d09e2d5f78c95f` |
 | Historical tag | `generation-frozen-G`（immutable；superseded formal candidates excluded） |
-| Generation instrument `G2` full hash | G2 tag 建立后随 `S` 回填 |
+| Generation instrument `G2` full hash | `544540beedb707c2be5c08fa1647107f80587c84` |
 | Generation tag | `generation-frozen-G2` |
-| Generation date | G2 tag 建立后随 `S` 回填 |
-| Session operation `S` full hash | `TBD` |
-| `G2 → S` 非 docs diff | `TBD` |
-| `S` prompt hash 复核 | `TBD` |
+| Generation date | 2026-07-26 |
+| Session operation `S` full hash | 由唯一 audit commit 回填 |
+| `G2 → S` 非 docs diff | 由唯一 audit commit 记录 |
+| `S` prompt hash 复核 | 由唯一 audit commit 记录 |
 | G→G2 upgrade record | `docs/verification_records/g2_instrument_upgrade.md` |
+| G2 generation record | `docs/verification_records/stage_d_g2_generation.md` |
 | Audit commit | `S` 后恰好一个；message `docs: audit record for S` |
 | Session checkout endpoint | 上述唯一 audit commit |
-| Session 前 `G2 → audit` 非 docs diff | `TBD` |
-| Session 前 `S → audit` 非 docs diff | `TBD` |
-| Session 前 prompt hash 复核 | `TBD` |
+| Session 前 `G2 → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
+| Session 前 `S → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
+| Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |
 
 当前操作版本层固定为 `G2`（annotated tag）→ `S`（whitelist/台账
 commit）→ 唯一 audit commit。历史 `G`、G-era runs 与升级过程保留在
@@ -101,6 +106,29 @@ hash；其身份由正式操作分支的 `HEAD`、固定 commit message 及 pare
 共同核对。
 
 若建立 G2 后发现代码缺陷，不得在 `G2 → S` 间直接修补。必须二选一并留档：保持 G2 完成实验并把缺陷写入 limitation；或修复后废止当前正式候选文档、建立新 generation tag 并重新生成全部九个文档。不得混用两个仪器版本。
+
+### 1.3.1 正式 session 的离线配置与物理隔离
+
+正式 session 使用以下本地配置；这是手册中的操作凭据，本次 S 文档落地不
+修改本机 `.env`：
+
+```dotenv
+LLM_BACKEND=ollama
+OLLAMA_MODEL=llama3.2:3b
+LLM_STRICT_MODE=true
+FREEZE_LABELS=true
+LLM_TIMEOUT_SECONDS=60
+LLM_TEMPERATURE=0
+LLM_SEED=42
+LLM_MAX_TOKENS=1024
+```
+
+Session 前必须从本地 `.env` 移除 Azure key，并停止 Ollama，形成云端凭据与
+本地模型服务的双重物理隔离。完成隔离后不得再触发生成、LLM clustering、
+LLM labelling 或 suggestion 路径；`FREEZE_LABELS=true` 的正式 session
+只使用已经生成并列入 whitelist 的固定文档。参与者 move 只走既有
+`/feedback/recluster`，该路径在 labels frozen 时不调用 labeller。若 session
+工具或隔离方式将来需要代码改动，必须另立 instrument 版本，不能混入 S。
 
 ### 1.4 盲测纪律
 
@@ -153,6 +181,13 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 - 若文档只有一个 cluster，界面没有可表达“拆分成多个 cluster”的 move
   目标。Researcher 不提示判断，但要特别留意并在 think-aloud/field note
   中记录参与者自发表达的拆分意愿；这类口头观察不能伪装成 move 记录。
+- 两个已知单簇正式文档为
+  `P2_task1_batchB / 6a666d4f04fc296116b621af` 与
+  `P3_task2_batchA / 6a666f0d5f60ce182f69ff12`。两者没有可用的 move
+  目标；其 confirm 指标必须连同单簇背景解释，不能简称为完整“接受率”。
+- 对细粒度、多簇文档，界面同样没有“把两个 cluster 合并”的独立动作。
+  Researcher 只记录参与者自然说出的 merge 意愿或 navigation 负担，不主动
+  追问、不把口头观察编码为 confirm/move。
 
 ### 2.2 卡片弹回
 
@@ -171,6 +206,17 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 - 单人、单标签页、每 fragment 串行写入的 session 中，`409` 理论上不应发生。
 - 出现 `409` 时将其记为实验异常事件，不把失败动作计为成功 move。
 - `404` 或 `422` 表示请求引用关系不合法，同样记录并停止该卡的继续操作，直至数据库投影恢复。
+
+### 2.4 Think-aloud 与观察笔记隔离
+
+- 采用自然观察方案：固定记录参与者自发说出的 split、merge 与 navigation
+  意愿；researcher 不主动追问这些判断。
+- 观察笔记与 `clusterFeedback` 定量数据物理隔离，存放在独立的 session
+  field-note 记录中，不写入 MongoDB，不伪装成 confirm、move 或 no-op。
+- 定量分析只使用 whitelist 文档的 `clusterFeedback`；观察笔记只作质性
+  上下文。二者在原始存储、导出文件和分析步骤中均保持分离。
+- 本裁定不授权修改 session 工具。将来若要加入 split/merge 控件或结构化
+  观察字段，必须建立新的 instrument 版本，不能作为 S 的补丁。
 
 ## 3. Session 后检查单
 
@@ -278,12 +324,16 @@ VERIFY_REL_2
 ```
 
 后续新增任何开发、Swagger 或恢复测试身份，必须先登记在此名单，再产生测试数据。
+S 建立时已逐项核对上述名单；没有从 private generation ledger 发现新的
+participant 身份。正式分析仍须先运行 `distinct("participant_id")`，不能把
+本快照当作未来数据的自动许可。
 
 ### 4.4 开发与 smoke 文档排除名单
 
 以下文档真实存在于 `documents` 与 `pipelineRuns`，但绝不进入正式 doc ID
-whitelist，也绝不进入分析。阶段 D 每个 smoke 完成或失败后立即登记其
-`doc_id`；正式分析开始前任一空缺都必须先对账。
+whitelist，也绝不进入分析。生成冻结期先把每个 smoke/attempt 写入 ignored
+private ledger；九个正式文档完成后在 S 中一次性回填本表，避免生成期间
+产生 tracked docs 变更。正式分析开始前本表必须完成对账。
 
 | Survey name | 用途 | doc_id（阶段 D 登记） |
 | --- | --- | --- |
@@ -293,9 +343,10 @@ whitelist，也绝不进入分析。阶段 D 每个 smoke 完成或失败后立�
 | `P1_task1_batchA_attempt2` | G-era completed formal candidate；G2 后 superseded | `6a64e3a53e0dbddf5447c782` |
 | `P2_task2_batchC` | G-era completed formal candidate；G2 后 superseded | `6a651c263e0dbddf5447c796` |
 | `P3_task3_batchB` | G-era formal attempt；assignment 失败并触发 G2 | `6a651df93e0dbddf5447c7ad` |
-| `D_SMOKE_G2_LLAMA_batchA` | G2 Llama 20 行配置/provider/schema smoke | |
-| `D_SMOKE_G2_QWEN_batchA` | G2 Qwen 20 行配置/provider/schema smoke | |
-| `D_SMOKE_G2_AZURE_batchA` | G2 Azure deployment/schema 20 行 smoke | |
+| `D_SMOKE_G2_LLAMA_batchA` | G2 Llama smoke attempt 1；旧 Azure 监听进程造成 backend mismatch；run completed 但验收拒绝 | `6a660bdef041b5fef471e029` |
+| `D_SMOKE_G2_LLAMA_batchA_attempt2` | 获批的环境恢复重试；G2 Llama smoke；completed | `6a66119a59652a872b0639b2` |
+| `D_SMOKE_G2_QWEN_batchA` | G2 Qwen 20 行配置/provider/schema smoke；completed | `6a661d1ec2a3cea7e6de6028` |
+| `D_SMOKE_G2_AZURE_batchA` | G2 Azure deployment/schema 20 行 smoke；completed | `6a661f814b63e7a3c45dd144` |
 | `P1_task2_batchB` | 2026-07-16 历史开发文档；与未来 Azure 正式文档同名 | `6a58d2cd1d6d1e80c35ba564` |
 
 所有分析脚本必须同时实施两道 document 门禁：
@@ -323,17 +374,55 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 
   将结果与第 4.3 节排除名单及正式身份 `P1`、`P2`、`P3` 逐项对账。出现名单外身份即为漏登记：立即暂停分析、查明来源并完成登记或排除，不得静默忽略后继续分析。
 - `clusterFeedback` 按 `participant_id` 精确匹配，不使用“排除 TEST 后全部保留”的宽松规则。
-- 同一 participant、doc、fragment 的当前裁定顺序为 `{timestamp: -1, _id: -1}`，取第一条为 latest action。
-- confirm 与 move 记录共存；latest action 只决定当前状态，不覆盖历史记录。
-- “实际审查片段数”定义为该 participant 在该 doc 上至少留有一条 feedback 的不同 `fragment_id` 数。
-- confirm rate、move rate 按实际审查片段数归一化。
+- 分析单位固定为 participant + doc + fragment。同一分析单位的有效记录按
+  `{timestamp: -1, _id: -1}` 排序，取第一条作为 latest effective action。
+- `confirm` 表示明确认可当前 placement；`move` 表示显式纠正。若先 confirm
+  后 move，最终状态归入 move，但两条 provenance 均保留，不覆盖历史记录。
+- 没有任何有效 feedback 的 eligible fragment 记为
+  `no recorded decision (reject-or-unreviewed)`；不得自动推断为接受、拒绝或
+  已审查。
+- `eligible fragments` 定义为该正式 whitelist 文档在生成时通过 relevance
+  并进入 Cluster Graph 的 kept fragments。分母按 participant + doc 固定，
+  不是“至少留过一条 feedback 的片段数”。
+- `confirm / eligible` 报告为确认覆盖率或认可率下界；`move / eligible`
+  报告为显式纠正率；`no recorded decision / eligible` 作为剩余比例同时报告。
+  禁止把 `confirm / eligible` 简称为完整“接受率”。
+- 两个单簇文档 `6a666d4f04fc296116b621af` 与
+  `6a666f0d5f60ce182f69ff12` 必须显式标注粒度背景：其 move 在结构上不可用，
+  split 意愿只存在于物理隔离的 think-aloud/field note 中。
 - `pipelineRuns.doc_id` 与 `clusterFeedback.doc_id` 必须同为 BSON `ObjectId` 后再 join。
 - 只有满足 `{status: "completed", finished_at: {$exists: true}}`、backend/model 与正式条件一致、`params.temperature=0`、`params.seed=42`、`params.max_tokens=1024`、`params.timeout_seconds=60`、`params.max_retries=0`、`params.schema_enforced=true`、`params.schema_version="stage_d_structured_output_v1"`、`params.schema_dynamic_cluster_id_enum=true`、schema transport 匹配 backend，且 `code_version` 精确等于 `generation-frozen-G2` tag target 的 run 才能进入实验。
 - 遗留 `status: "running"` 的非当前 run 视为进程中断并作废；没有 `status` 字段的旧 P1 run 属开发数据，一律排除。
 - 正式分析同时使用 participant 排除名单、正式 doc ID whitelist 与第 4.4 节开发/smoke doc ID 排除名单；必须执行“在 whitelist 且不在 smoke 排除名单”的 document 双门禁，不能只依赖 survey name。`P1_task2_batchB` 的历史/正式同名碰撞必须按两个不同 BSON `ObjectId` 处理，禁止按名称 join。
 - 模型间 cluster 粒度、过滤数量和实际审查数量的差异保留为结果，不通过删除记录强行等量化。
+- Smoke 只属于开发/配置证据，不进入 Results，也不用于估计正式文档的
+  relevance 产出率。G2 正式粒度画像为 Qwen `1/1/2`、Azure `8/11/10`、
+  Llama `6/7/15`；原始矩阵顺序与逐文档计数见生成记录。该差异只在参与者
+  数据产生后结合任务背景解释，不据此重生成。
 
-## 6. 已知边界与历史包装
+## 6. PILOT 隔离与正式文档只读规则
+
+- 九个正式 whitelist 文档从 S 建立起到正式 session 结束均视为只读生成
+  资产。PILOT 禁止直接打开或操作正式 `nie` 数据库中的九个 doc ID。
+- `participant=PILOT` 只能隔离 `clusterFeedback.participant_id`，不能隔离
+  recluster 的全局副作用。Recluster 会修改正式 fragment 的 `cluster_id`、
+  cluster membership 与 centroid，因此不能靠 participant 标签保护正式文档。
+- P2 的完整彩排必须使用独立 `nie_pilot` 数据库，或使用经过逐字段验证的
+  专用副本文档。必须对 `documents`、`fragments` 与 `clusters` 的全部
+  非易失字段逐字段比较；若复制需要重映射 ObjectId，还必须验证完整映射、
+  fragment identity、cluster membership、label、centroid 及来源正式 doc ID。
+  任何未验证字段或不一致都必须 fail closed。
+- PILOT 的文档、feedback、观察笔记与导出永不进入正式 whitelist 或正式
+  分析。正式 participant 排除与 document 双门禁仍同时生效。
+- 本次 S 只冻结隔离规则，不制作副本、不启动 PILOT、不写入 MongoDB。
+  `nie_pilot`/专用副本方案必须在 S 后另行审查批准。
+- P2 是优先完整彩排顺序：Qwen 单簇
+  `6a666d4f04fc296116b621af` → Llama 15 簇
+  `6a662346b88c6db2d9915ac9` → Azure 8 簇
+  `6a667375aaaa46976afdb5dc`。彩排副本用于演练从 split 意愿观察切换到
+  merge/navigation 观察的 researcher 负担，不得触碰这三个正式 ID。
+
+## 7. 已知边界与历史包装
 
 - `react-client/src/api/dataFacade.ts::cluster_recordFeedback` 调用 `storage.recordClusterFeedback`，属于 api-server 历史路径。当前实验 UI 没有调用它；P1 中勿用勿删，避免误认成第二条正式 feedback 写入路径。
 - P1 将 cosine suggestion 的 `SUGGEST_AT` 设为 `9999`，正式 session 不展示 suggestion cards。相关 accept/reject 代码保留但不属于当前参与者流程。
@@ -342,13 +431,22 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 - 启用 `FREEZE_LABELS` 时，`/cluster/run`、`/label/clusters`、`/suggest/save` 在任何数据库写入前返回 `423 Locked` 和 `labels_frozen`；`/llm-cluster/run` 不受 freeze 阻塞，其生成结果进入正式实验仍由 strict mode 与正式 doc ID whitelist 共同门禁。
 - Strict experiment mode 已实现并验证（commit `f7421cf`，2026-07-18）；正式文档生成必须使用该模式，使 LLM 请求失败或无效响应显式终止 run，不写入 heuristic fallback 聚类结果。
 - G-era assignment prompt 已于 commit `f7421cf` 修订，明确列出合法整数 cluster ID。两个不同正式数据集上仍出现列表外 ID，按预注册常备触发器升级 G2。G2 为三个模型统一施加 `stage_d_structured_output_v1`：relevance、initial 与 assignment 走共享 schema；assignment 合法 ID enum 按调用动态生成；本地 strict 校验不撤。Strict 本地闸直接解析原始 JSON、拒绝 Markdown fence，并拒绝字符串/数组形式的 `cluster_id`。G-era completed 文档均为 superseded。完整边界与台账见 `docs/verification_records/g2_instrument_upgrade.md`。
+- G→G2 只作为生成仪器可靠性与 provenance 流程证据，不是模型质量结果。
+  G 的三个 Llama 首次正式尝试为 `1/3 completed`，两个失败均为非法
+  cluster ID；G2 Llama 为 `3/3 completed`，G2 全矩阵为 `9/9 completed`。
+  未 embed 的 G smoke 是 API 编排事故，provider 未调用，不计作 schema
+  失败。G/G2 之间的粒度差异属于仪器边界诊断，不与正式 participant
+  Results 混合。
 - Sampling 参数已实现并验证（commit `2567fc3`，2026-07-19；验证记录 `docs/verification_records/sampling_freeze.md`）。三个模型统一请求 `temperature=0`、`seed=42`、`max_tokens=1024` 与 60 秒 timeout，SDK 隐藏重试保持为零。G-era 相同输入、模型和请求参数的两个运行产生了不同 assignment decision behavior；固定 seed 未保证决策结果一致。原始输出未保存并逐位比较，因此不得上升为“输出不具备逐位复现性”。Prompt、schema 与 sampling 参数共同构成冻结的 G2 实验仪器；正式生成开始后若必须修改任一项，旧仪器下的全部正式候选 run 均作废并重新生成，且所有尝试记录保留。
 - 本地模型选择已验证并留档于 `docs/verification_records/local_model_selection.md`。候选 `qwen2.5:7b` 在唯一一次 20 行门禁运行的首个 relevance 调用中触发 `ReadTimeout`，strict run 失败且零簇落库；未重试、未放宽 60 秒共同 timeout。预定义回退 `qwen2.5:3b` 在相同配置下唯一一次完成，因此最终本地模型固定为 `llama3.2:3b + qwen2.5:3b`。
 - 阶段 D 按模型分组生成：Llama 三个 → Qwen 三个 → Azure 三个。每次只切换一次 `.env` 并完整重启，先做非正式 smoke 并核对 `pipelineRuns`，再生成该模型的三个正式文档。完整顺序、输入 manifest、失败处理和九文档台账见 `docs/stage_d_generation_runbook.md`。
 - Azure/Mistral backend 已通过共享 provider 接入并完成技术验证（共享层 commit `936fdda`，Azure 实现 commit `434efe1`，验证记录 `docs/verification_records/azure_mistral.md`）。已验证 `Mistral-Large-3` deployment version `1`、`GlobalStandard`、60 秒 timeout、零隐藏重试、active-backend-only 配置校验、Ollama 离线隔离、缺 key fail-loud 及 content-filter 失败语义。
+- 本研究三次正式 Azure run 未观察到 `CONTENT_FILTERED`。该陈述只覆盖这
+  三次已记录运行，不得外推为 Azure、Mistral、该 deployment 或未来请求
+  不会触发内容过滤。
 - 性健康 smoke test 仅运行一次并以 `status: "completed"` 终局结束（结果 commit `da5a49a`），未触发 content filter。该单行测试只覆盖 relevance 与首簇创建分支，不能视为多片段 assignment 或正式批次验证；正式生成仍受最终模型选择、clean worktree 与正式 doc ID whitelist 门禁。
 
-## 7. 变更记录
+## 8. 变更记录
 
 | 日期 | 变更 |
 | --- | --- |
@@ -364,3 +462,4 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 | 2026-07-25 | 在 `G` 前固定 20 行 smoke 输入、smoke 文档排除双门禁、Ollama digest 与 Azure deployment 存活检查、人工批准的 `_attemptN` 失败协议，以及 `G → S → audit commit` 三层版本结构。 |
 | 2026-07-25 | 记录首次 Llama smoke 的 `NO_EMBEDDED_FRAGMENTS` 编排失败；固定底层 API 的 `ingest → embed → LLM` 全量计数门禁，并登记历史 `P1_task2_batchB` 同名开发 doc ID 与分析排除规则。 |
 | 2026-07-26 | 记录 G-era 重复 assignment 协议违规、G2 structured-output 仪器、G-era superseded/排除文档、G2 provenance 验收字段及 `G2 → S → audit` 版本结构。 |
+| 2026-07-26 | 回填 G2 9/9 whitelist、全部 generation/smoke 排除记录、eligible-fragment 指标、单簇解释、think-aloud 物理隔离及 PILOT 数据库隔离铁律；建立 operational S 文档。 |
