@@ -20,7 +20,7 @@ from typing import Generator
 
 import numpy as np
 
-from services import llm_provider
+from services import llm_provider, llm_schemas
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +102,20 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
-def _call_llm(prompt: str) -> str:
+def _call_llm(
+    prompt: str,
+    *,
+    response_spec: llm_schemas.StructuredOutputSpec | None = None,
+) -> str:
     """Call the configured LLM and return raw text."""
-    return llm_provider.call_text(prompt, purpose="clustering")
+    if response_spec is None:
+        return llm_provider.call_text(prompt, purpose="clustering")
+    return llm_provider.call_text(
+        prompt,
+        purpose="clustering",
+        response_schema=response_spec.schema,
+        schema_name=response_spec.name,
+    )
 
 
 def _parse_json(text: str) -> dict:
@@ -138,11 +149,21 @@ Reply with JSON only — no markdown, no explanation:
 {{"relevant": true}} or {{"relevant": false}}"""
 
     try:
-        result = _parse_json(_call_llm(prompt))
+        result = _parse_json(_call_llm(
+            prompt,
+            response_spec=(
+                llm_schemas.build_relevance_spec() if strict else None
+            ),
+        ))
         if strict and not isinstance(result, dict):
             raise LLMStrictModeError(
                 "INVALID_LLM_RESPONSE",
                 "LLM relevance response must be a JSON object.",
+            )
+        if strict and set(result) != {"relevant"}:
+            raise LLMStrictModeError(
+                "INVALID_LLM_RESPONSE",
+                "LLM relevance response has an invalid object shape.",
             )
         if strict and type(result.get("relevant")) is not bool:
             raise LLMStrictModeError(
@@ -192,13 +213,25 @@ Reply with JSON only:
 {{"label": "<short theme label, max 6 words>", "summary": "<one sentence describing the theme>"}}"""
         raw_response: str | None = None
         try:
-            raw_response = _call_llm(prompt)
+            raw_response = _call_llm(
+                prompt,
+                response_spec=(
+                    llm_schemas.build_initial_cluster_spec()
+                    if strict
+                    else None
+                ),
+            )
             result = _parse_json(raw_response)
             if strict:
                 if not isinstance(result, dict):
                     raise LLMStrictModeError(
                         "INVALID_LLM_RESPONSE",
                         "LLM initial cluster response must be a JSON object.",
+                    )
+                if set(result) != {"label", "summary"}:
+                    raise LLMStrictModeError(
+                        "INVALID_LLM_RESPONSE",
+                        "LLM initial cluster response has an invalid object shape.",
                     )
                 label = _required_text(result, "label")
                 summary = _required_text(result, "summary")
@@ -248,23 +281,52 @@ Rules:
 - Create a new cluster only if the response introduces a genuinely distinct theme not covered above.
 - For action "assign", cluster_id must be exactly one integer from the valid existing cluster IDs above.
 - Never invent, infer, or increment a cluster ID.
-- If no existing cluster fits, return action "new" with label and summary, and do not include cluster_id.
+- If no existing cluster fits, use action "new" with label and summary, and do not include cluster_id.
 - Keep cluster labels short (max 6 words).
 
 Reply with JSON only — no markdown, no explanation.
-For assign, return only action and a valid integer cluster_id.
-For new, return only action, label, and summary."""
+Return exactly one top-level "decision" object.
+For assign: {{"decision": {{"action": "assign", "cluster_id": <valid integer>}}}}
+For new: {{"decision": {{"action": "new", "label": "<short theme label>", "summary": "<one sentence>"}}}}"""
 
     raw_response = None
     try:
-        raw_response = _call_llm(prompt)
+        raw_response = _call_llm(
+            prompt,
+            response_spec=(
+                llm_schemas.build_assignment_spec(valid_cluster_ids)
+                if strict
+                else None
+            ),
+        )
         result = _parse_json(raw_response)
         if strict and not isinstance(result, dict):
             raise LLMStrictModeError(
                 "INVALID_LLM_RESPONSE",
                 "LLM assignment response must be a JSON object.",
             )
+        if strict:
+            if set(result) != {"decision"}:
+                raise LLMStrictModeError(
+                    "INVALID_LLM_RESPONSE",
+                    "LLM assignment response requires one decision object.",
+                )
+            decision = result.get("decision")
+            if not isinstance(decision, dict):
+                raise LLMStrictModeError(
+                    "INVALID_LLM_RESPONSE",
+                    "LLM assignment decision must be a JSON object.",
+                )
+            result = decision
+        elif isinstance(result, dict) and isinstance(result.get("decision"), dict):
+            result = result["decision"]
+
         if result.get("action") == "assign":
+            if strict and set(result) != {"action", "cluster_id"}:
+                raise LLMStrictModeError(
+                    "INVALID_LLM_RESPONSE",
+                    "LLM assign decision has an invalid object shape.",
+                )
             if strict:
                 cluster_id = _strict_cluster_id(result.get("cluster_id"))
             else:
@@ -281,6 +343,11 @@ For new, return only action, label, and summary."""
 
         if result.get("action") == "new":
             if strict:
+                if set(result) != {"action", "label", "summary"}:
+                    raise LLMStrictModeError(
+                        "INVALID_LLM_RESPONSE",
+                        "LLM new-cluster decision has an invalid object shape.",
+                    )
                 label = _required_text(result, "label")
                 summary = _required_text(result, "summary")
                 return {"action": "new", "label": label, "summary": summary}

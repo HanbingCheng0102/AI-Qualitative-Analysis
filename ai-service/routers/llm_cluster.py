@@ -157,7 +157,9 @@ def _start_pipeline_run(
         llm_backend, model_name = _get_model_metadata()
         params = {
             "column_filters": dict(req.column_filters),
-            **llm_provider.get_run_parameters(),
+            **llm_provider.get_run_parameters(
+                schema_enforced=strict_mode,
+            ),
         }
         record = {
             "doc_id": doc_oid,

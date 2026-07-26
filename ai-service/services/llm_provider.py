@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Literal
 
-from services import experiment_config
+from services import experiment_config, llm_schemas
 
 
 LLMPurpose = Literal["clustering", "labelling"]
@@ -127,7 +127,7 @@ def get_sensitive_values() -> tuple[str, ...]:
     return (api_key,) if api_key else ()
 
 
-def get_run_parameters() -> dict[str, object]:
+def get_run_parameters(*, schema_enforced: bool = False) -> dict[str, object]:
     config = get_active_backend_config()
     temperature = config.temperature
     if temperature is None and config.backend in {"azure", "openai"}:
@@ -148,6 +148,16 @@ def get_run_parameters() -> dict[str, object]:
         "seed": config.seed if config.backend != "anthropic" else None,
         "seed_semantics": seed_semantics,
         "max_tokens": max_tokens,
+        "schema_enforced": schema_enforced,
+        "schema_version": (
+            llm_schemas.SCHEMA_VERSION if schema_enforced else None
+        ),
+        "schema_transport": (
+            llm_schemas.schema_transport_for_backend(config.backend)
+            if schema_enforced
+            else None
+        ),
+        "schema_dynamic_cluster_id_enum": schema_enforced,
     }
     if config.backend == "azure":
         parameters.update({
@@ -162,7 +172,15 @@ def _call_anthropic(
     prompt: str,
     config: LLMBackendConfig,
     purpose: LLMPurpose,
+    *,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
 ) -> str:
+    if response_schema is not None:
+        raise LLMProviderError(
+            "SCHEMA_UNSUPPORTED",
+            "The active LLM backend does not support the required schema.",
+        )
     import anthropic
 
     max_tokens = config.max_tokens
@@ -229,6 +247,9 @@ def _call_openai_compatible(
     prompt: str,
     config: LLMBackendConfig,
     purpose: LLMPurpose,
+    *,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
 ) -> str:
     from openai import OpenAI
 
@@ -255,6 +276,15 @@ def _call_openai_compatible(
             request_options["seed"] = config.seed
         if config.max_tokens is not None:
             request_options["max_tokens"] = config.max_tokens
+        if response_schema is not None:
+            request_options["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "strict": True,
+                    "schema": response_schema,
+                },
+            }
         response = client.chat.completions.create(**request_options)
     except Exception as exc:
         if config.backend == "azure" and _is_azure_content_filter_error(exc):
@@ -286,22 +316,43 @@ def _call_openai(
     prompt: str,
     config: LLMBackendConfig,
     purpose: LLMPurpose,
+    *,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
 ) -> str:
-    return _call_openai_compatible(prompt, config, purpose)
+    return _call_openai_compatible(
+        prompt,
+        config,
+        purpose,
+        response_schema=response_schema,
+        schema_name=schema_name,
+    )
 
 
 def _call_azure(
     prompt: str,
     config: LLMBackendConfig,
     purpose: LLMPurpose,
+    *,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
 ) -> str:
-    return _call_openai_compatible(prompt, config, purpose)
+    return _call_openai_compatible(
+        prompt,
+        config,
+        purpose,
+        response_schema=response_schema,
+        schema_name=schema_name,
+    )
 
 
 def _call_ollama(
     prompt: str,
     config: LLMBackendConfig,
     _purpose: LLMPurpose,
+    *,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
 ) -> str:
     import httpx
 
@@ -319,6 +370,8 @@ def _call_ollama(
     }
     if options:
         request_body["options"] = options
+    if response_schema is not None:
+        request_body["format"] = response_schema
 
     with httpx.Client(timeout=config.timeout_seconds) as client:
         response = client.post(
@@ -329,7 +382,20 @@ def _call_ollama(
         return response.json()["response"]
 
 
-def call_text(prompt: str, *, purpose: LLMPurpose) -> str:
+def call_text(
+    prompt: str,
+    *,
+    purpose: LLMPurpose,
+    response_schema: dict[str, object] | None = None,
+    schema_name: str | None = None,
+) -> str:
+    if (response_schema is None) != (schema_name is None):
+        raise ValueError(
+            "response_schema and schema_name must be provided together."
+        )
+    if schema_name is not None and not schema_name.strip():
+        raise ValueError("schema_name must not be empty.")
+
     config = get_active_backend_config()
     callers = {
         "anthropic": _call_anthropic,
@@ -343,4 +409,10 @@ def call_text(prompt: str, *, purpose: LLMPurpose) -> str:
         raise RuntimeError(
             f"Unsupported LLM_BACKEND={config.backend!r}."
         ) from exc
-    return caller(prompt, config, purpose)
+    return caller(
+        prompt,
+        config,
+        purpose,
+        response_schema=response_schema,
+        schema_name=schema_name,
+    )

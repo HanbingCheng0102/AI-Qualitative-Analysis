@@ -175,6 +175,29 @@ class ExperimentConfigTests(unittest.TestCase):
 
 
 class LLMClustererStrictTests(unittest.TestCase):
+    def test_relevance_strict_passes_the_shared_schema(self):
+        captured_spec = None
+
+        def respond(_prompt, **kwargs):
+            nonlocal captured_spec
+            captured_spec = kwargs["response_spec"]
+            return '{"relevant": true}'
+
+        with patch.object(llm_clusterer, "_call_llm", side_effect=respond):
+            self.assertTrue(
+                llm_clusterer.is_relevant(
+                    "response",
+                    "question",
+                    strict=True,
+                )
+            )
+
+        self.assertEqual("stage_d_relevance_v1", captured_spec.name)
+        self.assertEqual(
+            {"type": "boolean"},
+            captured_spec.schema["properties"]["relevant"],
+        )
+
     def test_relevance_request_failure_raises_in_strict_mode(self):
         with patch.object(
             llm_clusterer,
@@ -227,11 +250,32 @@ class LLMClustererStrictTests(unittest.TestCase):
 
         self.assertEqual("INVALID_LLM_JSON", raised.exception.code)
 
+    def test_initial_cluster_strict_passes_the_shared_schema(self):
+        captured_spec = None
+
+        def respond(_prompt, **kwargs):
+            nonlocal captured_spec
+            captured_spec = kwargs["response_spec"]
+            return '{"label": "Theme", "summary": "Summary"}'
+
+        with patch.object(llm_clusterer, "_call_llm", side_effect=respond):
+            result = llm_clusterer.assign_fragment(
+                "response",
+                [],
+                "question",
+                strict=True,
+            )
+
+        self.assertEqual("stage_d_initial_cluster_v1", captured_spec.name)
+        self.assertEqual("new", result["action"])
+
     def test_new_cluster_requires_label_and_summary(self):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "new", "label": "Theme"}',
+            return_value=(
+                '{"decision": {"action": "new", "label": "Theme"}}'
+            ),
         ):
             with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
                 llm_clusterer.assign_fragment(
@@ -245,11 +289,15 @@ class LLMClustererStrictTests(unittest.TestCase):
 
     def test_assignment_prompt_enumerates_valid_integer_ids(self):
         captured_prompt = ""
+        captured_spec = None
 
-        def respond(prompt):
-            nonlocal captured_prompt
+        def respond(prompt, **kwargs):
+            nonlocal captured_prompt, captured_spec
             captured_prompt = prompt
-            return '{"action": "assign", "cluster_id": 3}'
+            captured_spec = kwargs["response_spec"]
+            return (
+                '{"decision": {"action": "assign", "cluster_id": 3}}'
+            )
 
         with patch.object(llm_clusterer, "_call_llm", side_effect=respond):
             result = llm_clusterer.assign_fragment(
@@ -269,14 +317,22 @@ class LLMClustererStrictTests(unittest.TestCase):
             captured_prompt,
         )
         self.assertIn("Never invent, infer, or increment a cluster ID", captured_prompt)
-        self.assertIn('return action "new"', captured_prompt)
+        self.assertIn('use action "new"', captured_prompt)
         self.assertIn("do not include cluster_id", captured_prompt)
+        self.assertIn('top-level "decision" object', captured_prompt)
+        assignment_branches = captured_spec.schema["properties"]["decision"]["anyOf"]
+        self.assertEqual(
+            [3, 7],
+            assignment_branches[0]["properties"]["cluster_id"]["enum"],
+        )
 
     def test_assignment_rejects_unknown_cluster_id(self):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "assign", "cluster_id": 99}',
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": 99}}'
+            ),
         ), self.assertLogs(llm_clusterer.logger, level="WARNING") as captured:
             with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
                 llm_clusterer.assign_fragment(
@@ -292,11 +348,32 @@ class LLMClustererStrictTests(unittest.TestCase):
         self.assertIn("raw_response", captured.output[0])
         self.assertIn("cluster_id\": 99", captured.output[0])
 
+    def test_assignment_second_gate_rejects_extra_fields(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": 0, '
+                '"extra": true}}'
+            ),
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
+                    "response",
+                    [{"id": 0, "label": "Existing", "summary": "Summary"}],
+                    "question",
+                    strict=True,
+                )
+
+        self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
+
     def test_assignment_rejects_a_float_cluster_id(self):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "assign", "cluster_id": 0.5}',
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": 0.5}}'
+            ),
         ):
             with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
                 llm_clusterer.assign_fragment(
@@ -312,7 +389,9 @@ class LLMClustererStrictTests(unittest.TestCase):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "assign", "cluster_id": "0"}',
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": "0"}}'
+            ),
         ):
             result = llm_clusterer.assign_fragment(
                 "response",
@@ -329,7 +408,12 @@ class LLMClustererStrictTests(unittest.TestCase):
             with self.subTest(cluster_id=cluster_id), patch.object(
                 llm_clusterer,
                 "_call_llm",
-                return_value=json.dumps({"action": "assign", "cluster_id": cluster_id}),
+                return_value=json.dumps({
+                    "decision": {
+                        "action": "assign",
+                        "cluster_id": cluster_id,
+                    },
+                }),
             ):
                 result = llm_clusterer.assign_fragment(
                     "response",
@@ -343,7 +427,9 @@ class LLMClustererStrictTests(unittest.TestCase):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "assign", "cluster_id": [0]}',
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": [0]}}'
+            ),
         ):
             result = llm_clusterer.assign_fragment(
                 "response",
@@ -358,7 +444,9 @@ class LLMClustererStrictTests(unittest.TestCase):
         with patch.object(
             llm_clusterer,
             "_call_llm",
-            return_value='{"action": "assign", "cluster_id": [0, 1]}',
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": [0, 1]}}'
+            ),
         ):
             with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
                 llm_clusterer.assign_fragment(
@@ -451,6 +539,12 @@ class PipelineRunStateTests(unittest.TestCase):
             "provider_protocol": "openai_v1",
             "model_version": "1",
             "deployment_type": "GlobalStandard",
+            "schema_enforced": True,
+            "schema_version": "stage_d_structured_output_v1",
+            "schema_transport": (
+                "openai_chat_completions_response_format_json_schema"
+            ),
+            "schema_dynamic_cluster_id_enum": True,
         }
 
         with patch.object(
@@ -465,7 +559,7 @@ class PipelineRunStateTests(unittest.TestCase):
             llm_cluster.llm_provider,
             "get_run_parameters",
             return_value=run_parameters,
-        ):
+        ) as parameters:
             llm_cluster._start_pipeline_run(
                 db,
                 request,
@@ -473,6 +567,7 @@ class PipelineRunStateTests(unittest.TestCase):
                 True,
             )
 
+        parameters.assert_called_once_with(schema_enforced=True)
         inserted = db["pipelineRuns"].insert_one.call_args.args[0]
         self.assertEqual("azure", inserted["llm_backend"])
         self.assertEqual("Mistral-Large-3", inserted["model_name"])
