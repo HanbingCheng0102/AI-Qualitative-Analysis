@@ -311,3 +311,27 @@ post-merge automated test: 50 tests; OK
 The sampling-parameter decision and subsequent prompt/parameter freeze remain
 mandatory gates before Stage D formal document generation. They are the next
 methodology step and do not reopen the completed C2 backend-integration work.
+
+## G2 Structured-Output Capability Addendum
+
+On 2026-07-26 the configured Azure `Mistral-Large-3`, version `1`,
+`GlobalStandard` deployment accepted one strict
+`response_format=json_schema` request through the same OpenAI SDK
+`chat.completions.create` path used by the production provider. The synthetic
+prompt requested an illegal assignment ID while the schema allowed only ID
+`0` or a valid new-cluster branch. The response ended with
+`finish_reason=stop`, selected legal ID `0`, and passed the local schema
+validator. One request was made with zero retry and no MongoDB write.
+
+Microsoft's published structured-output support list did not name this model.
+The project therefore treats the live result as capability evidence for this
+recorded deployment and request only, not as a general claim about all Azure
+or Mistral deployments. One valid answer also cannot prove that the service
+did not silently ignore the schema and independently comply; the adversarial
+prompt reduces that risk, while the unchanged local strict parser remains the
+second gate.
+
+The full three-backend probe, formalised probe hash, schema hash, production
+base-payload hashes, safe rerun mode, and interpretation limit are recorded in
+`docs/verification_records/g2_probe.md`. The G-to-G2 decision boundary is in
+`docs/verification_records/g2_instrument_upgrade.md`.

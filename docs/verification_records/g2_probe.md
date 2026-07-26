@@ -29,6 +29,13 @@ behaviour. Daily tests mock the live path; provider calls occur only when the
 operator explicitly requests live mode. The formalised file is a maintained
 successor, not a claim that its bytes are identical to the ignored helper.
 
+- formalised file SHA-256:
+  `57162707779770fb7c036e284697bb645d79f5e5275ef85c53ab384f9818c23b`
+- formalised Git blob object:
+  `8ffe424d75782517efedf219d7a1f7d1caf57254`
+- first G2 implementation commit:
+  `697bece97573a3f3ee616cd8dce2f17e8f400eea`
+
 The provider-neutral assignment schema used by all three probes had SHA-256:
 
 `94b4e83a001b59faa1006e5e9ec6711a17c08572147112f8c9824a447ea12848`

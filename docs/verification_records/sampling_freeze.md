@@ -30,12 +30,13 @@ LLM_TIMEOUT_SECONDS=60
 SDK max_retries=0
 ```
 
-`temperature=0` prioritises reproducibility for the single-shot comparison.
-`seed=42` is sent to both experimental provider protocols. Ollama documents
-this as a provider-supported seed; the Azure OpenAI-compatible endpoint treats
-it as best-effort beta behaviour, so this project does not claim byte-identical
-Azure reruns. `max_tokens=1024` is a shared output cap for the short JSON
-protocol and maps to Ollama `num_predict=1024`.
+`temperature=0` reduces requested sampling variation for the single-shot
+comparison. `seed=42` is sent to both experimental provider protocols.
+Provider metadata describes Ollama as `provider_supported` and the Azure
+OpenAI-compatible endpoint as `best_effort_beta`; those labels record request
+semantics, not a guarantee that repeated runs produce identical decisions.
+`max_tokens=1024` is a shared output cap for the short JSON protocol and maps
+to Ollama `num_predict=1024`.
 
 `pipelineRuns.params` records the requested values and the provider-specific
 `seed_semantics` on every new LLM Semantic run.
@@ -135,16 +136,52 @@ as observed model-granularity differences. These development runs establish
 configuration and execution correctness; they are not formal comparison data
 and are excluded by the formal document whitelist.
 
+## Stage D Decision-Consistency Qualification
+
+During G-era formal generation, two Llama runs used the same input, model,
+prompt, and requested sampling parameters. The first produced an illegal
+assignment decision and the approved second attempt completed with legal
+assignment behaviour. The supported observation is:
+
+> With the same input, model, and requested parameters, the two runs produced
+> different assignment decision behaviour; the fixed seed did not guarantee
+> identical decision results.
+
+The raw provider outputs were not retained and compared byte for byte.
+Accordingly, this record does not claim that the full outputs were or were not
+byte-identical. It qualifies the earlier provider seed labels at the observed
+decision level only. Complete attempt provenance is therefore required even
+when temperature and seed are fixed.
+
+## G2 Instrument Amendment
+
+G-era prompt-only decoding produced out-of-list cluster IDs on two different
+formal datasets. The approved G2 instrument retains the sampling profile in
+this record but adds the shared schema version
+`stage_d_structured_output_v1` and a decision-envelope change to the
+existing-assignment prompt. All three models receive the same schema
+semantics through their production transports, while the local strict parser
+remains a second gate.
+
+The G-era and G2 prompt hashes and the exact methodological boundary are
+preserved in `docs/verification_records/g2_instrument_upgrade.md`. G-era
+completed candidates are superseded; all nine accepted formal documents must
+be regenerated under one `generation-frozen-G2` tag target.
+
 ## Freeze Policy
 
-The assignment prompt from commit `f7421cf` and the sampling profile from
-commit `2567fc3` together define the frozen experiment instrument. The three
-compared models must use this same prompt and requested sampling profile.
+For G, the assignment prompt from commit `f7421cf` and the sampling profile
+from commit `2567fc3` defined the frozen instrument. For G2, the preserved
+sampling profile, the G2 prompt era, and
+`stage_d_structured_output_v1` together define the frozen instrument. The
+three compared models must use the same requested profile and G2 schema
+semantics.
 
-No prompt or sampling value may change after formal Stage D generation starts.
-If a change is methodologically necessary, every formal candidate run produced
-under the previous instrument is invalid and must be regenerated. Every failed
-or repeated generation attempt remains in `pipelineRuns` and must be reported.
+No G2 prompt, schema, or sampling value may change after G2 formal Stage D
+generation starts. If a change is methodologically necessary, every formal
+candidate run produced under the previous instrument is invalid and must be
+regenerated. Every failed or repeated generation attempt remains in
+`pipelineRuns` and must be reported.
 
 ## Verdict
 

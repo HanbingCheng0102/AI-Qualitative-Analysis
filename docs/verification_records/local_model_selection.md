@@ -135,7 +135,25 @@ cloud:   Mistral-Large-3 (Azure deployment version 1, GlobalStandard)
 ```
 
 `qwen2.5:7b` is excluded from participant-facing document generation because
-it could not complete the pre-registered gate under the shared timeout on the
-test hardware. Its failed run remains a development finding relevant to the
-local hardware/cost discussion and limitation section; it is not formal
-participant comparison data.
+its single pre-registered gate attempt on the test hardware timed out during
+the first relevance call under the shared 60-second limit. The run was not
+retried and the limit was not relaxed. This is one local observation, not a
+claim that the 7B model is generally unavailable. The failed run remains a
+development finding relevant to the local hardware/cost discussion and
+limitation section; it is not formal participant comparison data.
+
+## G2 Addendum
+
+The G-to-G2 structured-output upgrade does not reopen model selection. Before
+implementation, both selected local configurations passed one synthetic,
+database-free assignment-schema probe through the production Ollama
+`/api/generate` provider path. Each used its recorded digest, made one request
+with zero retry, and returned a locally schema-valid legal assignment despite
+an adversarial illegal-ID instruction.
+
+This is a transport/capability gate, not a clustering-quality comparison and
+not a replacement for the required G2 smoke. In particular,
+`qwen2.5:3b` had not yet produced a Stage D G-era formal run; its first
+end-to-end G2 strict behaviour will be observed in the G2 smoke and formal
+block. Full probe evidence is in
+`docs/verification_records/g2_probe.md`.

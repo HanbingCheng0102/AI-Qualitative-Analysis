@@ -1,10 +1,11 @@
 # 阶段 D：9 个正式文档生成手册
 
 本手册是阶段 D 的唯一操作清单。它只记录已裁定的实验条件。第 2 节
-source manifest 与本手册全部生成规程必须在建立 `G` 前定稿并提交。第 4 节
-`G` 凭据、第 8 节生成台账与第 9 节 `S` 凭据属于生成后 docs-only 回填项；
-它们不构成自指式的生成前门禁。正式源材料和派生 CSV 只保存在本机，
-不得加入 Git。
+source manifest 已在建立 `G` 前定稿。`G` 运行暴露的重复 assignment
+协议违规按预注册触发器升级为结构化输出仪器；当前正式生成只允许使用
+第 4 节定义的 `G2`。第 8 节生成台账与第 9 节 `S` 凭据属于生成后
+docs-only 回填项；它们不构成自指式的生成前门禁。正式源材料和派生 CSV
+只保存在本机，不得加入 Git。
 
 ## 1. 当前裁定
 
@@ -32,8 +33,15 @@ LLM_MAX_TOKENS=1024
 SDK max_retries=0
 ```
 
-Assignment prompt 固定为 commit `f7421cf` 的版本。三个模型必须使用同一
-prompt、research question、CSV 字节内容和 sampling 参数。
+G-era assignment prompt 以 commit `f7421cf` 为边界。G2 只把
+existing-assignment 输出包装成固定 decision envelope，其 byte hash 为
+`992487fd59b21235eea7cc96ea6d539b4ff06706e22fab3208afd6862093664f`；
+relevance、initial-assignment 与 labelling prompt 的 G-era hash 保持不变。
+G2 的 prompt/instrument 实现边界 commit 为
+`697bece97573a3f3ee616cd8dce2f17e8f400eea`。三个模型必须使用同一 prompt、
+research question、CSV 字节内容、sampling 参数及
+`stage_d_structured_output_v1` schema 仪器。完整双时代 hash 表见
+`docs/verification_records/g2_instrument_upgrade.md`。
 
 ## 2. 正式输入 Manifest（生成前必须填满）
 
@@ -88,44 +96,60 @@ Manifest 验收条件：
 backend、digest、deployment 或矩阵；三场 session 之间不透露任何模型信息。
 这是本研究 single-blind 的操作定义。
 
-## 4. G：生成仪器版本冻结
+## 4. G 与 G2：生成仪器版本冻结
 
-只有第 2 节 manifest 填满并提交、所有测试通过、工作树干净后，才能建立
-`G`。`G` 是九个正式文档唯一允许的 `pipelineRuns.code_version`。
+### 4.1 G 历史凭据与升级触发
 
-在 `provenance-extension` 上执行：
+`generation-frozen-G` 永久指向
+`da47d0eda734fc4136b8303a03d09e2d5f78c95f`，不得移动、覆盖或重建。
+G-era 完成了一个 Llama smoke 和两个 Llama 正式候选，但在两个不同正式
+Batch 上出现修复后 prompt 仍返回列表外 cluster ID 的 assignment
+协议违规。第二个不同数据集上的同类违规击发 prompt 修复销案时保留的
+常备触发器；它不是 Batch A `_attempt2` 决策树的分支二。
+
+G-era 两个 completed 正式候选已裁定为 superseded，全部 G-era 文档与 run
+保留在数据库中但不得进入正式 whitelist。G 与 G2 不得混用。完整触发链、
+G-era 台账及方法论边界见
+`docs/verification_records/g2_instrument_upgrade.md`。
+
+### 4.2 G2 仪器与候选门禁
+
+G2 为 relevance、initial assignment 与 existing assignment 共用同一
+schema 构造模块；schema version 固定为
+`stage_d_structured_output_v1`。Existing assignment 的合法 cluster ID
+enum 随每次请求动态生成。Ollama 通过 native `/api/generate` 的 `format`
+传输，Azure 通过 OpenAI-compatible `response_format=json_schema` strict
+传输。原有本地 strict parser、分支形状与合法 ID 校验继续作为第二道闸；
+labelling 不施加 schema。
+
+三个正式 backend 的生产路径 capability probe 已全部通过；证据、脚本哈希、
+payload 哈希及静默忽略限界见
+`docs/verification_records/g2_probe.md`。
+
+G2 候选只允许在 `codex/g2-structured-output` 上、工作树干净后执行：
 
 ```powershell
 git status --short
 git rev-parse HEAD
 cd D:\6003\thematic_clusters_git\ai-service
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_prompts_match_pre_refactor_byte_hashes -v
+.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_current_prompts_match_g2_byte_hashes -v
 ```
 
-`git status --short` 必须无输出。全部测试通过后，回到仓库根目录建立不可
-移动的 annotated tag：
+完整测试与独立 prompt hash 门禁必须全绿。候选 full hash 报告并获得明确
+“创建 G2”批准后，才允许建立并 push 不可移动的 annotated tag：
 
 ```powershell
-git tag -a generation-frozen-G -m "Freeze Stage D generation instrument"
-git push origin generation-frozen-G
+git tag -a generation-frozen-G2 -m "Freeze Stage D G2 generation instrument"
+git push origin generation-frozen-G2
+git rev-parse 'generation-frozen-G2^{commit}'
+git ls-remote origin refs/tags/generation-frozen-G2
 ```
 
-版本凭据（建立 tag 后填写）：
-
-| 凭据 | 值 |
-| --- | --- |
-| `G` full hash | `TBD` |
-| Tag | `generation-frozen-G` |
-| 冻结日期 | `TBD` |
-| 完整测试摘要 | `TBD` |
-| Prompt hash 测试 | `TBD` |
-
-`G` 的 full hash 只有 tag 建立后才存在，因此本表在九文档生成完成后随
-生成台账一起写入 `S`；不得为了提前回填本表而在 `G → S` 之间建立中间
-docs commit。Tag 本身及 tag target 的核对记录是生成期间的版本凭据。
-
-Tag 建立后，除非阶段 D 整体重置，不得移动或重建该 tag。
+后两项必须共同证明本地 tag 与 origin tag 指向已批准的候选 full hash。
+从 tag 建立起，九个正式文档唯一允许的 `pipelineRuns.code_version` 是该
+G2 tag target。`generation-frozen-G2` 不得移动、覆盖或重建；任何后续代码
+或 prompt 改动都必须停止生成并重新裁定。
 
 ## 5. 每个模型块的共同前置
 
@@ -135,7 +159,7 @@ Tag 建立后，除非阶段 D 整体重置，不得移动或重建该 tag。
 每个模型块开始前：
 
 1. 确认 `git status --short` 无输出。
-2. 确认 `git rev-parse HEAD` 等于 `G`。
+2. 确认 `git rev-parse HEAD` 等于 `generation-frozen-G2` 的 tag target。
 3. 核对共同冻结参数。
 4. 核对 backend、精确 model name 及本地 digest/云端 deployment metadata。
 5. 执行一个非正式 20 行 smoke：
@@ -145,11 +169,11 @@ Tag 建立后，除非阶段 D 整体重置，不得移动或重建该 tag。
    - 行数：20。
    - SHA-256：
      `9270f9dad53d00777e822b5c26356f5eab28a3a1cae9e64ee6c6f50d8fadcd7a`。
-   - Survey name：`D_SMOKE_LLAMA_batchA`、`D_SMOKE_QWEN_batchA` 或
-     `D_SMOKE_AZURE_batchA`
+   - Survey name：`D_SMOKE_G2_LLAMA_batchA`、
+     `D_SMOKE_G2_QWEN_batchA` 或 `D_SMOKE_G2_AZURE_batchA`
    - Pipeline：`LLM Semantic`
 6. 只接受 smoke 的 `status: "completed"`、`strict_mode: true`、
-   `code_version=G`、backend/model/params 全部匹配。
+   `code_version` 精确等于 G2 tag target、backend/model/params 全部匹配。
 7. Smoke doc 不进入正式 whitelist；其 `doc_id` 必须立即登记到下表和
    `docs/P1_session_manual.md` 第 4.4 节的开发/smoke 文档排除名单。
 
@@ -157,12 +181,16 @@ Tag 建立后，除非阶段 D 整体重置，不得移动或重建该 tag。
 分支可完成及 metadata 可追溯，不是正式比较数据。名称中的 `batchA` 只是
 开发文档命名与 `batch_label` 解析需要；输入并非正式 Batch A。
 
-| Smoke survey name | Expected backend/model | doc_id | run_id | outcome |
+| G2 smoke survey name | Expected backend/model | doc_id | run_id | outcome |
 | --- | --- | --- | --- | --- |
-| `D_SMOKE_LLAMA_batchA` | `ollama` / `llama3.2:3b` | `6a64c2e83e0dbddf5447c741` | `6a64c2e93e0dbddf5447c756` | `failed`；`NO_EMBEDDED_FRAGMENTS` at `load_fragments`；provider 未调用 |
-| `D_SMOKE_LLAMA_batchA_attempt2` | `ollama` / `llama3.2:3b` | | | 2026-07-25 已批准；待执行 |
-| `D_SMOKE_QWEN_batchA` | `ollama` / `qwen2.5:3b` | | | 待执行 |
-| `D_SMOKE_AZURE_batchA` | `azure` / `Mistral-Large-3` | | | 待执行 |
+| `D_SMOKE_G2_LLAMA_batchA` | `ollama` / `llama3.2:3b` | | | 待执行 |
+| `D_SMOKE_G2_QWEN_batchA` | `ollama` / `qwen2.5:3b` | | | 待执行 |
+| `D_SMOKE_G2_AZURE_batchA` | `azure` / `Mistral-Large-3` | | | 待执行 |
+
+G-era smoke `D_SMOKE_LLAMA_batchA` 与
+`D_SMOKE_LLAMA_batchA_attempt2` 已永久进入开发/smoke 排除名单；G2 不复用
+这些文档或名称。G2 三个 smoke 都必须重新 ingest、embed 20/20，并在 G2
+仪器上完成一次新的 LLM run。
 
 任一 smoke 失败：停止该模型块，不生成其正式文档，不立即重试。
 
@@ -217,7 +245,7 @@ AZURE_OPENAI_DEPLOYMENT_TYPE=GlobalStandard
 AZURE_OPENAI_API_KEY=<LOCAL_SECRET_ONLY>
 ```
 
-完整重启后，以 `D_SMOKE_AZURE_batchA` 作为 deployment 存活、endpoint
+完整重启后，以 `D_SMOKE_G2_AZURE_batchA` 作为 deployment 存活、endpoint
 可达、key 有效及当前配额可用的真实 provider 门禁，不另发会绕过
 `pipelineRuns` 的临时请求。若 smoke 因 authentication、deployment not
 found、quota/rate limit、network 或其他基础设施原因失败，应归类为
@@ -242,8 +270,8 @@ smoke 和正式文档必须显式、按顺序执行以下完整调用链，不�
 1. 重新计算即将上传的 CSV SHA-256：
    - smoke 必须匹配第 5 节的 20 行 hash；
    - 正式文档必须匹配第 2 节对应 Batch hash。
-2. 生成前确认 `git status --short` 无输出、`git rev-parse HEAD` 等于 `G`，
-   并核对本模型块的有效配置。
+2. 生成前确认 `git status --short` 无输出、`git rev-parse HEAD` 等于
+   `generation-frozen-G2` 的 tag target，并核对本模型块的有效配置。
 3. `POST /ingest/survey`：
    - file 为本次已核对 hash 的 CSV；
    - `survey_name` 必须逐字等于矩阵值或已批准的 `_attemptN` 值；
@@ -264,7 +292,10 @@ smoke 和正式文档必须显式、按顺序执行以下完整调用链，不�
 
 任何按名查询仅可用于碰撞审计，不能决定后续 API 的 `doc_id`。已知具体案例：
 历史开发文档 `P1_task2_batchB / 6a58d2cd1d6d1e80c35ba564` 与未来 Azure
-正式文档同名；两者只能靠 `doc_id` 区分。
+正式文档同名；两者只能靠 `doc_id` 区分。G2 还保留原矩阵 survey name，
+所以三个 Llama 名称都可能与 G-era attempt/candidate 同名。每次 G2 ingest
+必须保存新返回的 `doc_id`，验证它不等于排除台账中的旧 ID，并只沿该新 ID
+调用 embed、LLM 与验收；禁止按名称选“最新一条”。
 
 ### 7.2 单个 run 验收
 
@@ -286,10 +317,16 @@ db.clusters.countDocuments({survey_doc_id: DOC})
 
 - `status: "completed"` 且存在 `finished_at`。
 - `pipeline: "llm_semantic"`、`strict_mode: true`。
-- `code_version` 精确等于 `G`。
+- `code_version` 精确等于 `generation-frozen-G2` 的 tag target。
 - `llm_backend`、`model_name`、Azure version/deployment 与矩阵一致。
 - `params` 包含 60 / 0 / 42 / 1024、`max_retries: 0` 和正确
   `seed_semantics`。
+- `params.schema_enforced: true`、
+  `params.schema_version: "stage_d_structured_output_v1"`、
+  `params.schema_dynamic_cluster_id_enum: true`，且
+  `params.schema_transport` 对 Ollama 为
+  `ollama_api_generate_format`、对 Azure 为
+  `openai_chat_completions_response_format_json_schema`。
 - `batch_label` 与矩阵一致，不得为 `UNKNOWN`。
 - 不存在任何 `failure_*` 字段。
 - fragment 数等于 manifest 行数。
@@ -302,7 +339,7 @@ db.clusters.countDocuments({survey_doc_id: DOC})
 attempt 必须保留并进入第 8 节全尝试台账；正式 whitelist 只纳入最终获批的
 completed doc ID。
 
-## 8. 九文档生成台账
+## 8. G2 九文档生成台账
 
 | Survey name | Expected model | Expected batch | doc_id | run_id | status | fragments | clusters | started_at | finished_at | code_version |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -321,37 +358,38 @@ completed doc ID。
 
 ### 8.1 全尝试与失败台账
 
-初始尝试及每个获批 retry 均须逐行添加；不得只登记最终成功项。
+初始尝试及每个获批 retry 均须逐行添加；不得只登记最终成功项。G-era
+记录是仪器升级证据，不计入 G2 九文档，但必须永久保留并排除。
 
 | Survey name | Attempt | doc_id | run_id | status | failure count | failure stage/code/type | decision |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `D_SMOKE_LLAMA_batchA` | 1 | `6a64c2e83e0dbddf5447c741` | `6a64c2e93e0dbddf5447c756` | `failed` | 1 | `load_fragments` / `NO_EMBEDDED_FRAGMENTS` / `PipelineRunAbort` | 编排遗漏；provider 未调用；记录保留；`_attempt2` 已批准 |
-| 其余尝试生成后逐行添加 |  |  |  |  |  |  |  |
+| `D_SMOKE_LLAMA_batchA` | 1 | `6a64c2e83e0dbddf5447c741` | `6a64c2e93e0dbddf5447c756` | `failed` | 1 | `load_fragments` / `NO_EMBEDDED_FRAGMENTS` / `PipelineRunAbort` | G-era；编排遗漏；provider 未调用；保留并排除 |
+| `D_SMOKE_LLAMA_batchA_attempt2` | 2 | `6a64c6bb3e0dbddf5447c757` | `6a64c6be3e0dbddf5447c76c` | `completed` | 1 cumulative | none | G-era smoke；保留并排除 |
+| `P1_task1_batchA` | 1 | `6a64c87f3e0dbddf5447c76f` | `6a64c8813e0dbddf5447c781` | `failed` | 1 | `cluster_assignment` / `INVALID_LLM_RESPONSE` / out-of-list ID | G-era；记录保留；`_attempt2` 获批 |
+| `P1_task1_batchA_attempt2` | 2 | `6a64e3a53e0dbddf5447c782` | `6a64e3a63e0dbddf5447c794` | `completed` | 1 cumulative | none | G-era completed；G2 升级后 superseded；永不 whitelist |
+| `P2_task2_batchC` | 1 | `6a651c263e0dbddf5447c796` | `6a651c283e0dbddf5447c7ab` | `completed` | 0 | none | G-era completed；G2 升级后 superseded；永不 whitelist |
+| `P3_task3_batchB` | 1 | `6a651df93e0dbddf5447c7ad` | `6a651dfa3e0dbddf5447c7c3` | `failed` | 1 | `cluster_assignment` / `INVALID_LLM_RESPONSE` / out-of-list ID | 常备触发器击发；停止 G；不做 retry |
+| G2 后续尝试生成后逐行添加 |  |  |  |  |  |  |  |
 
 ## 9. S：Session 操作版本与等价性证明
 
-`G → S` 之间只允许一个已于 2026-07-25 明确批准的例外 docs-only commit，
-message 固定为 `docs: record Stage D API orchestration gate`。它只记录首次
-smoke 的编排失败、显式 `ingest → embed → LLM` 门禁及同名开发文档碰撞；
-不得修改代码、prompt、参数、模型、正式输入或矩阵，也不产生新的版本层。
-除该 commit 外，九文档完成前不得建立其他 commit。
-
-九文档全部验收后，只允许一次性修改 `docs/`：回填第 4 节 `G` 凭据、
-第 5 节其余 smoke doc ID、
-第 8 节正式与全尝试台账，以及 `docs/P1_session_manual.md` 的正式 whitelist
-和 smoke 排除名单。该 docs-only commit 定义为 `S`。
+G2 tag 建立后到九文档完成前不得修改代码、prompt、schema、参数、模型、
+正式输入或矩阵。三个 G2 smoke 与九个正式文档全部验收后，只允许一次性
+修改 `docs/`：回填 G2 tag 凭据、第 5 节 smoke doc ID、第 8 节正式与全尝试
+台账，以及 `docs/P1_session_manual.md` 的正式 whitelist、superseded 与
+smoke 排除名单。该 docs-only commit 定义为 `S`。
 
 在 `S` 上执行并记录：
 
 ```powershell
 git status --short
-git diff --exit-code generation-frozen-G..S_FULL_HASH -- . ':(exclude)docs'
+git diff --exit-code generation-frozen-G2..S_FULL_HASH -- . ':(exclude)docs'
 cd D:\6003\thematic_clusters_git\ai-service
-.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_prompts_match_pre_refactor_byte_hashes -v
+.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_current_prompts_match_g2_byte_hashes -v
 ```
 
 要求：工作树干净；排除 `docs/` 后的 diff 无输出；prompt hash 测试通过。
-这证明 `S` 的运行代码与 `G` 的生成仪器等价。
+这证明 `S` 的运行代码与 G2 的生成仪器等价。
 
 `S` 无法在自身内容中记录自己的 full hash。`S` 及上述等价性结果产生后，
 允许恰好一个后续 docs-only commit，commit message 固定为
@@ -359,26 +397,27 @@ cd D:\6003\thematic_clusters_git\ai-service
 得到的等价性/prompt-hash 结果写入版本凭据，不得修改任何操作性内容。
 
 正式 session 的固定 checkout 端点是该唯一 audit commit，即
-`provenance-extension` 在 audit commit 完成后的 `HEAD`，不是裸 `S`。Session
-前固定运行：
+承载 audit commit 的正式操作分支 `HEAD`，不是裸 `S`。Session 前固定运行：
 
 ```powershell
 git status --short
-git diff --exit-code generation-frozen-G..HEAD -- . ':(exclude)docs'
+git diff --exit-code generation-frozen-G2..HEAD -- . ':(exclude)docs'
 git diff --exit-code S_FULL_HASH..HEAD -- . ':(exclude)docs'
 cd D:\6003\thematic_clusters_git\ai-service
-.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_prompts_match_pre_refactor_byte_hashes -v
+.\venv\Scripts\python.exe -m unittest tests.test_llm_provider.PromptFreezeTests.test_current_prompts_match_g2_byte_hashes -v
 ```
 
 两条 diff 都必须无输出；audit commit 的 parent 必须是 `S`，且 commit
 message 必须逐字等于上述固定值。三层版本关系固定为：
-`G`（annotated tag）→ `S`（whitelist/台账 commit）→ 唯一 audit commit。
+`G2`（annotated tag）→ `S`（whitelist/台账 commit）→ 唯一 audit commit。
+历史 `G` 与 G-era runs 留在 provenance 链中，但不构成最终 session 的
+运行版本层。
 
-若 `G` 后发现任何代码缺陷，禁止在 `G → S` 间直接修补。必须单独裁定：
+若 G2 后发现任何代码缺陷，禁止在 `G2 → S` 间直接修补。必须单独裁定：
 
-- 保留 `G` 的代码完成实验，并将缺陷写入 limitation；或
-- 修复代码、废止当前正式候选文档、使用新名称（例如
-  `generation-frozen-G-v2`）建立新 tag，并重新生成全部九个文档。
+- 保留 G2 的代码完成实验，并将缺陷写入 limitation；或
+- 修复代码、废止当前正式候选文档、建立新 generation tag，并重新生成
+  全部九个文档。
 
 不得混用两个仪器版本生成同一正式矩阵。
 
@@ -391,6 +430,9 @@ message 必须逐字等于上述固定值。三层版本关系固定为：
 3. `docs/verification_records/sampling_freeze.md`
 4. `docs/verification_records/local_model_selection.md`
 5. `docs/verification_records/azure_mistral.md`
+6. `docs/verification_records/g2_probe.md`
+7. `docs/verification_records/g2_instrument_upgrade.md`
 
-新任务的第一项工作是完成第 2 节 source manifest。不得跳过 manifest、直接
-上传现有测试 CSV 或生成正式文档。
+新任务首先核对 G2 tag 状态、clean worktree 与当前已批准步骤。第 2 节
+manifest 已冻结，不得改动。不得重新使用 G-era 候选、跳过 smoke、直接上传
+其他 CSV 或生成正式文档。
