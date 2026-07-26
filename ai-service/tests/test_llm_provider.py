@@ -591,9 +591,11 @@ class PromptFreezeTests(unittest.TestCase):
         "existing_assignment": "7bb5a5d9f0a70965314a1bc3a642f97c5410dc37c8ccab52b04926e134f7343d",
         "labelling": "f3c5e4b0e97cbfe06e90b7b83d28cd0c2fb50d00ec9fb181515e9467bc395536",
     }
-    # Replaced after the first implementation commit so the final G2
-    # candidate records the exact commit at which this prompt era begins.
-    G2_ERA_BOUNDARY_COMMIT = "PENDING_IMPLEMENTATION_COMMIT"
+    # First implementation commit for the G2 prompt/instrument boundary.
+    # Later documentation-only commits do not redefine this prompt boundary.
+    G2_ERA_BOUNDARY_COMMIT = (
+        "697bece97573a3f3ee616cd8dce2f17e8f400eea"
+    )
     G2_ERA_EXPECTED_HASHES = {
         "relevance": "189d583cbd52e0839250fafe3cf0e73f22cf27b7cc13344178bf10435b4ab1a4",
         "initial_assignment": "d8ca347ba17007747c8ca0783edde2e2983dc70f19d6e0749474511972bef06b",
