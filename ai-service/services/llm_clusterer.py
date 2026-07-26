@@ -51,31 +51,14 @@ def _required_text(result: dict, field_name: str) -> str:
 
 
 def _strict_cluster_id(value: object) -> int:
-    if isinstance(value, list):
-        if len(value) != 1:
-            raise LLMStrictModeError(
-                "INVALID_LLM_RESPONSE",
-                (
-                    "LLM assign response returned an ambiguous cluster_id list; "
-                    f"received {len(value)} items."
-                ),
-            )
-        value = value[0]
-
     if type(value) is int and value >= 0:
         return value
     if isinstance(value, float) and math.isfinite(value) and value >= 0 and value.is_integer():
         return int(value)
-    if isinstance(value, str):
-        text = value.strip()
-        if re.fullmatch(r"\d+", text):
-            return int(text)
-        if re.fullmatch(r"\d+\.0+", text):
-            return int(text.split(".", 1)[0])
     raise LLMStrictModeError(
         "INVALID_LLM_RESPONSE",
         (
-            "LLM assign response requires a losslessly integer cluster_id; "
+            "LLM assign response requires a non-negative JSON integer value; "
             f"received type {type(value).__name__}."
         ),
     )
@@ -125,8 +108,8 @@ def _call_llm(
     )
 
 
-def _parse_json(text: str) -> dict:
-    return json.loads(_strip_markdown(text))
+def _parse_json(text: str, *, strict: bool = False) -> object:
+    return json.loads(text if strict else _strip_markdown(text))
 
 
 # ---------------------------------------------------------------------------
@@ -156,12 +139,15 @@ Reply with JSON only — no markdown, no explanation:
 {{"relevant": true}} or {{"relevant": false}}"""
 
     try:
-        result = _parse_json(_call_llm(
-            prompt,
-            response_spec=(
-                llm_schemas.build_relevance_spec() if strict else None
+        result = _parse_json(
+            _call_llm(
+                prompt,
+                response_spec=(
+                    llm_schemas.build_relevance_spec() if strict else None
+                ),
             ),
-        ))
+            strict=strict,
+        )
         if strict and not isinstance(result, dict):
             raise LLMStrictModeError(
                 "INVALID_LLM_RESPONSE",
@@ -228,7 +214,7 @@ Reply with JSON only:
                     else None
                 ),
             )
-            result = _parse_json(raw_response)
+            result = _parse_json(raw_response, strict=strict)
             if strict:
                 if not isinstance(result, dict):
                     raise LLMStrictModeError(
@@ -306,7 +292,7 @@ For new: {{"decision": {{"action": "new", "label": "<short theme label>", "summa
                 else None
             ),
         )
-        result = _parse_json(raw_response)
+        result = _parse_json(raw_response, strict=strict)
         if strict and not isinstance(result, dict):
             raise LLMStrictModeError(
                 "INVALID_LLM_RESPONSE",

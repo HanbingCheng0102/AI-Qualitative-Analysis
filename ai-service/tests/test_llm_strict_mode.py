@@ -238,6 +238,17 @@ class LLMClustererStrictTests(unittest.TestCase):
 
         self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
 
+    def test_relevance_strict_rejects_fenced_json(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value='```json\n{"relevant": true}\n```',
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.is_relevant("response", "question", strict=True)
+
+        self.assertEqual("INVALID_LLM_JSON", raised.exception.code)
+
     def test_initial_cluster_does_not_fall_back_to_theme_one(self):
         with patch.object(llm_clusterer, "_call_llm", return_value="not-json"):
             with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
@@ -268,6 +279,24 @@ class LLMClustererStrictTests(unittest.TestCase):
 
         self.assertEqual("stage_d_initial_cluster_v1", captured_spec.name)
         self.assertEqual("new", result["action"])
+
+    def test_initial_cluster_strict_rejects_fenced_json(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value=(
+                '```json\n{"label": "Theme", "summary": "Summary"}\n```'
+            ),
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
+                    "response",
+                    [],
+                    "question",
+                    strict=True,
+                )
+
+        self.assertEqual("INVALID_LLM_JSON", raised.exception.code)
 
     def test_new_cluster_requires_label_and_summary(self):
         with patch.object(
@@ -386,7 +415,7 @@ class LLMClustererStrictTests(unittest.TestCase):
 
         self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
 
-    def test_assignment_accepts_a_decimal_string_cluster_id(self):
+    def test_assignment_rejects_a_decimal_string_cluster_id(self):
         with patch.object(
             llm_clusterer,
             "_call_llm",
@@ -394,42 +423,40 @@ class LLMClustererStrictTests(unittest.TestCase):
                 '{"decision": {"action": "assign", "cluster_id": "0"}}'
             ),
         ):
-            result = llm_clusterer.assign_fragment(
-                "response",
-                [{"id": 0, "label": "Existing", "summary": "Summary"}],
-                "question",
-                strict=True,
-            )
-
-        self.assertEqual({"action": "assign", "cluster_id": 0}, result)
-
-    def test_assignment_accepts_lossless_decimal_cluster_ids(self):
-        cluster = [{"id": 0, "label": "Existing", "summary": "Summary"}]
-        for cluster_id in ("0.0", 0.0):
-            with self.subTest(cluster_id=cluster_id), patch.object(
-                llm_clusterer,
-                "_call_llm",
-                return_value=json.dumps({
-                    "decision": {
-                        "action": "assign",
-                        "cluster_id": cluster_id,
-                    },
-                }),
-            ):
-                result = llm_clusterer.assign_fragment(
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
                     "response",
-                    cluster,
+                    [{"id": 0, "label": "Existing", "summary": "Summary"}],
                     "question",
                     strict=True,
                 )
-                self.assertEqual({"action": "assign", "cluster_id": 0}, result)
 
-    def test_assignment_accepts_a_singleton_cluster_id_list(self):
+        self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
+
+    def test_assignment_rejects_a_decimal_string_number_cluster_id(self):
         with patch.object(
             llm_clusterer,
             "_call_llm",
             return_value=(
-                '{"decision": {"action": "assign", "cluster_id": [0]}}'
+                '{"decision": {"action": "assign", "cluster_id": "0.0"}}'
+            ),
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
+                    "response",
+                    [{"id": 0, "label": "Existing", "summary": "Summary"}],
+                    "question",
+                    strict=True,
+                )
+
+        self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
+
+    def test_assignment_accepts_an_integral_json_number_cluster_id(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": 0.0}}'
             ),
         ):
             result = llm_clusterer.assign_fragment(
@@ -440,6 +467,24 @@ class LLMClustererStrictTests(unittest.TestCase):
             )
 
         self.assertEqual({"action": "assign", "cluster_id": 0}, result)
+
+    def test_assignment_rejects_a_singleton_cluster_id_list(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value=(
+                '{"decision": {"action": "assign", "cluster_id": [0]}}'
+            ),
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
+                    "response",
+                    [{"id": 0, "label": "Existing", "summary": "Summary"}],
+                    "question",
+                    strict=True,
+                )
+
+        self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
 
     def test_assignment_rejects_an_ambiguous_cluster_id_list(self):
         with patch.object(
@@ -461,7 +506,35 @@ class LLMClustererStrictTests(unittest.TestCase):
                 )
 
         self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
-        self.assertIn("2 items", str(raised.exception))
+        self.assertIn("type list", str(raised.exception))
+
+    def test_assignment_strict_rejects_fenced_json(self):
+        with patch.object(
+            llm_clusterer,
+            "_call_llm",
+            return_value=(
+                '```json\n'
+                '{"decision": {"action": "assign", "cluster_id": 0}}\n'
+                '```'
+            ),
+        ):
+            with self.assertRaises(llm_clusterer.LLMStrictModeError) as raised:
+                llm_clusterer.assign_fragment(
+                    "response",
+                    [{"id": 0, "label": "Existing", "summary": "Summary"}],
+                    "question",
+                    strict=True,
+                )
+
+        self.assertEqual("INVALID_LLM_JSON", raised.exception.code)
+
+    def test_non_strict_json_parser_retains_fenced_compatibility(self):
+        self.assertEqual(
+            {"relevant": True},
+            llm_clusterer._parse_json(
+                '```json\n{"relevant": true}\n```',
+            ),
+        )
 
     def test_non_strict_assignment_retains_legacy_cluster_zero_fallback(self):
         with patch.object(llm_clusterer, "_call_llm", return_value="not-json"):
