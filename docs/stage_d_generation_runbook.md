@@ -120,7 +120,11 @@ schema 构造模块；schema version 固定为
 enum 随每次请求动态生成。Ollama 通过 native `/api/generate` 的 `format`
 传输，Azure 通过 OpenAI-compatible `response_format=json_schema` strict
 传输。原有本地 strict parser、分支形状与合法 ID 校验继续作为第二道闸；
-labelling 不施加 schema。
+labelling 不施加 schema。Strict 路径直接解析 provider 原始 JSON，不剥离
+Markdown fence；relevance、initial assignment、existing assignment 的 fenced
+JSON 一律失败。`cluster_id` 不接受字符串或数组；只接受非负 JSON integer，
+或按 JSON Schema integer 语义接受数值上为整数的有限非负 JSON number。
+非 strict 历史路径保留原有宽松解析。
 
 三个正式 backend 的生产路径 capability probe 已全部通过；证据、脚本哈希、
 payload 哈希及静默忽略限界见

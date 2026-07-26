@@ -57,6 +57,10 @@ The strict-rejection log hardening commit is:
 
 `9c87980a1c13901e5c933d6781419bed0b184814`
 
+The strict local second-gate hardening commit is:
+
+`333be70cf63be9cab4c959a73648344b074c248c`
+
 The shared schema version is:
 
 `stage_d_structured_output_v1`
@@ -81,6 +85,15 @@ schema-invalid, or locally invalid responses still fail the run. Labelling is
 unchanged and is not schema constrained. Strict assignment rejection logs
 record only a SHA-256 fingerprint and response length, never the raw model
 response.
+
+The second gate parses the raw provider text directly in strict mode.
+Markdown fences are invalid for relevance, initial-cluster, and assignment
+responses; fence stripping remains available only to historical non-strict
+paths. An assignment `cluster_id` must be a non-negative JSON integer value.
+Strings such as `"0"` or `"0.0"` and arrays such as `[0]` are rejected. A
+finite non-negative JSON number whose mathematical value is integral, such as
+`0.0`, is accepted in accordance with JSON Schema integer semantics and then
+normalised to the corresponding Python integer.
 
 Every G2 strict run must add these fields to `pipelineRuns.params`:
 
@@ -148,11 +161,15 @@ decision results. No claim of byte-level non-reproducibility is made.
 
 ## Gate and Version Structure
 
-On 2026-07-26, after the implementation and log-hardening commits and before
-the final law commit, the implementation gate produced:
+On 2026-07-26, the first candidate
+`6f933a0d536db80be0bab45f366d655cfeae3b6f` was explicitly denied a G2 tag
+because review found that the local second gate still accepted string/list
+cluster IDs and stripped Markdown fences in strict mode. The tag was not
+created. After the second-gate hardening commit, the implementation gate
+produced:
 
 ```text
-unittest discover: Ran 78 tests; OK (skipped=3)
+unittest discover: Ran 83 tests; OK (skipped=3)
 independent G2 prompt hash: Ran 1 test; OK
 ```
 
@@ -161,7 +178,9 @@ three-backend results were already obtained once and are recorded in
 `g2_probe.md`; ordinary discovery neither sends provider requests nor reads a
 live key. The full suite included the safe probe tests, shared schema tests,
 both transport mappings, dynamic-ID and second-gate tests, additive
-provenance tests, atomic failure tests, and both G/G2 prompt-era records.
+provenance tests, atomic failure tests, both G/G2 prompt-era records, strict
+type rejection, and fenced-JSON rejection for all three clustering response
+types.
 
 The G2 candidate must have a clean worktree and pass:
 

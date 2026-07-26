@@ -323,13 +323,14 @@ prompt requested an illegal assignment ID while the schema allowed only ID
 `finish_reason=stop`, selected legal ID `0`, and passed the local schema
 validator. One request was made with zero retry and no MongoDB write.
 
-Microsoft's published structured-output support list did not name this model.
-The project therefore treats the live result as capability evidence for this
-recorded deployment and request only, not as a general claim about all Azure
-or Mistral deployments. One valid answer also cannot prove that the service
-did not silently ignore the schema and independently comply; the adversarial
-prompt reduces that risk, while the unchanged local strict parser remains the
-second gate.
+Microsoft's
+[published structured-output support list](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs#supported-models)
+did not name this model. The project therefore treats the live result as
+capability evidence for this recorded deployment and request only, not as a
+general claim about all Azure or Mistral deployments. One valid answer also
+cannot prove that the service did not silently ignore the schema and
+independently comply; the adversarial prompt reduces that risk, while the
+independently hardened local strict parser remains the second gate.
 
 The full three-backend probe, formalised probe hash, schema hash, production
 base-payload hashes, safe rerun mode, and interpretation limit are recorded in
