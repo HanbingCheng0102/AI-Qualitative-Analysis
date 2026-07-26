@@ -345,8 +345,9 @@ class LLMClustererStrictTests(unittest.TestCase):
         self.assertEqual("INVALID_LLM_RESPONSE", raised.exception.code)
         self.assertIn("cluster_id=99", str(raised.exception))
         self.assertIn("valid_cluster_ids=[0]", str(raised.exception))
-        self.assertIn("raw_response", captured.output[0])
-        self.assertIn("cluster_id\": 99", captured.output[0])
+        self.assertIn("response_sha256=", captured.output[0])
+        self.assertIn("response_length=", captured.output[0])
+        self.assertNotIn("cluster_id\": 99", captured.output[0])
 
     def test_assignment_second_gate_rejects_extra_fields(self):
         with patch.object(

@@ -12,6 +12,7 @@ Both phases share the same LLM backend as labeller.py.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -86,13 +87,19 @@ def _log_strict_assignment_rejection(
     clusters: list[dict],
     exc: LLMStrictModeError,
 ) -> None:
+    response_fingerprint = (
+        hashlib.sha256(raw_response.encode("utf-8")).hexdigest()
+        if raw_response is not None
+        else None
+    )
     logger.warning(
         "Strict LLM assignment response rejected stage=%s code=%s "
-        "valid_cluster_ids=%s raw_response=%r",
+        "valid_cluster_ids=%s response_sha256=%s response_length=%s",
         stage,
         exc.code,
         sorted(cluster["id"] for cluster in clusters),
-        raw_response,
+        response_fingerprint,
+        len(raw_response) if raw_response is not None else None,
     )
 
 
