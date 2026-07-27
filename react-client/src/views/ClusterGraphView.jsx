@@ -1026,11 +1026,68 @@ export default function ClusterGraphView() {
     const location  = useLocation();
     const navigate  = useNavigate();
     const [clusterList] = useAtom(clusters);
-    const [inputVal, setInputVal] = useState(location.state?.doc_id ?? "");
-    const [docId, setDocId]       = useState(location.state?.doc_id ?? null);
+    const queryDocId = new URLSearchParams(location.search).get("docId")?.trim() ?? "";
+    const stateDocId = (location.state?.doc_id ?? "").trim();
+    const initialDocId = queryDocId || stateDocId;
+    const [inputVal, setInputVal] = useState(initialDocId);
+    const [docId, setDocId]       = useState(initialDocId || null);
     const participantId = getParticipant();
 
     const nonNoise = clusterList.filter(c => c.label !== "Uncategorised");
+
+    const selectDocument = useCallback(rawDocId => {
+        const nextDocId = rawDocId.trim();
+        const params = new URLSearchParams(location.search);
+
+        if (nextDocId) {
+            params.set("docId", nextDocId);
+        } else {
+            params.delete("docId");
+        }
+
+        setInputVal(nextDocId);
+        setDocId(nextDocId || null);
+        navigate(
+            {
+                pathname: location.pathname,
+                search: params.toString() ? `?${params.toString()}` : "",
+            },
+            { replace: true },
+        );
+    }, [location.pathname, location.search, navigate]);
+
+    // Older navigation paths pass the document only in transient route state.
+    // Canonicalise that value into the URL so refresh and copied links retain it.
+    useEffect(() => {
+        if (queryDocId || !stateDocId) return;
+
+        const params = new URLSearchParams(location.search);
+        params.set("docId", stateDocId);
+        navigate(
+            {
+                pathname: location.pathname,
+                search: `?${params.toString()}`,
+            },
+            { replace: true },
+        );
+    }, [
+        location.pathname,
+        location.search,
+        navigate,
+        queryDocId,
+        stateDocId,
+    ]);
+
+    // Keep the input and graph in sync when browser back/forward changes the URL.
+    useEffect(() => {
+        if (queryDocId) {
+            setInputVal(queryDocId);
+            setDocId(queryDocId);
+        } else if (!stateDocId) {
+            setInputVal("");
+            setDocId(null);
+        }
+    }, [queryDocId, stateDocId]);
 
     return (
         <>
@@ -1059,8 +1116,10 @@ export default function ClusterGraphView() {
                             type="text"
                             value={inputVal}
                             onChange={e => setInputVal(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") setDocId(inputVal.trim() || null); }}
-                            onBlur={() => setDocId(inputVal.trim() || null)}
+                            onKeyDown={e => {
+                                if (e.key === "Enter") selectDocument(inputVal);
+                            }}
+                            onBlur={() => selectDocument(inputVal)}
                             placeholder="Survey doc ID + Enter"
                             className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs
                                        focus:outline-none focus:ring-1 focus:ring-blue-400"

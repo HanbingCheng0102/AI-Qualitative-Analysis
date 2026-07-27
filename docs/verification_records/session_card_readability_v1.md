@@ -10,6 +10,8 @@ Date: 2026-07-27
 - Generation commit: `544540beedb707c2be5c08fa1647107f80587c84`
 - Operational S audit/rollback anchor:
   `ddb5355972ca63df44edad184b11e30f420e4c62`
+- Fixed-card inspection checkpoint:
+  `c5b7354fb4df23e60382f4858922adac516f81f9`
 - Candidate branch: `codex/session-card-readability-v1`
 - The candidate is an isolated session-interface change. It does not move or
   replace G2, Operational S, or the audit commit.
@@ -21,6 +23,8 @@ Date: 2026-07-27
   ```
 
 Do not use `reset`, force-push, or move an existing tag to perform the rollback.
+If only the URL-persistence addition needs to be removed, the fixed-card
+checkpoint above remains an exact intermediate rollback point.
 
 ## Pilot observation and intended change
 
@@ -39,6 +43,9 @@ full-text inspection layer:
 - the pinned view is independently scrollable and can be closed;
 - the note editor is a popover and does not resize the card;
 - dragging remains available from the card body.
+- the selected document ID is stored in the `docId` URL query parameter;
+  refresh, browser back/forward, and copied links retain the selection while
+  preserving the explicit participant query parameter.
 
 The presentation-only inspection state is held in React memory. It does not add
 or alter an API request, database write, participant action, or analysis field.
@@ -90,7 +97,7 @@ This candidate must not be used in a formal participant session until:
 
 1. the interface is re-tested using a fresh isolated `nie_pilot` environment;
 2. fixed-card dragging, confirm, move, note, hover/focus inspection, pin/close,
-   and keyboard behavior are exercised;
+   keyboard behavior, and document persistence after refresh are exercised;
 3. the post-PILOT dry-run confirms the recorded participant actions still match
    the observer's manual counts;
 4. the resulting candidate commit is explicitly approved as the new session
