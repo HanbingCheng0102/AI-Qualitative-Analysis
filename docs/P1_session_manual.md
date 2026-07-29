@@ -17,6 +17,26 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 - 确认 `pipelineRuns.llm_backend`、`model_name`、`code_version` 与本次批准的实验配置一致。
 - 确认该 doc 位于正式 doc ID whitelist，不是开发或测试文档。
 
+#### Session 仪器冻结裁定（2026-07-29）
+
+正式 P1/P2/P3 三场 session 统一使用精确 commit：
+
+```text
+ddb5355972ca63df44edad184b11e30f420e4c62
+```
+
+裁定采用“不修改 session UI”的路径。候选分支
+`codex/session-card-readability-v1` 及其 commits `c5b7354`、`2f49694`
+不得用于正式 session。该候选不仅改变字号或对比度，还增加 full-text
+hover/pin、note popover、键盘交互和 URL 文档持久化，因此属于未重新彩排和
+冻结的参与者仪器变化。
+
+第一场 session 前必须 detached checkout 到上述完整 hash，并核对 clean
+worktree。P1、P2、P3 三场之间绝对不得切换 commit、分支或修改参与者界面。
+若任何可读性问题被裁定为足以影响数据质量，必须在第一场前停止招募日程，
+建立新 instrument、在 `nie_pilot` 重跑彩排、重新冻结并更新版本凭据；不得
+在 participant 之间热修。
+
 #### 正式 doc ID whitelist 与盲测密钥（阶段 D 填写）
 
 阶段 D 的 9 个 G2 正式文档已经全部完成并通过矩阵级验收。只有下表中的
@@ -93,8 +113,8 @@ ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2
 | `S` prompt hash 复核 | 2026-07-26；Ran 1 test；OK |
 | G→G2 upgrade record | `docs/verification_records/g2_instrument_upgrade.md` |
 | G2 generation record | `docs/verification_records/stage_d_g2_generation.md` |
-| Audit commit | `S` 后恰好一个；message `docs: audit record for S` |
-| Session checkout endpoint | 上述唯一 audit commit |
+| Audit commit | `ddb5355972ca63df44edad184b11e30f420e4c62`；message `docs: audit record for S` |
+| Session checkout endpoint | `ddb5355972ca63df44edad184b11e30f420e4c62`（三场固定，不跟随分支移动） |
 | Session 前 `G2 → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
 | Session 前 `S → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
 | Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |
@@ -366,6 +386,8 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 
 ## 5. 分析约定
 
+### 5.1 Participant action 与分母
+
 - 正式分析前必须先在 mongosh 运行：
 
   ```javascript
@@ -390,6 +412,9 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 - 两个单簇文档 `6a666d4f04fc296116b621af` 与
   `6a666f0d5f60ce182f69ff12` 必须显式标注粒度背景：其 move 在结构上不可用，
   split 意愿只存在于物理隔离的 think-aloud/field note 中。
+
+### 5.2 Document、run 与粒度门禁
+
 - `pipelineRuns.doc_id` 与 `clusterFeedback.doc_id` 必须同为 BSON `ObjectId` 后再 join。
 - 只有满足 `{status: "completed", finished_at: {$exists: true}}`、backend/model 与正式条件一致、`params.temperature=0`、`params.seed=42`、`params.max_tokens=1024`、`params.timeout_seconds=60`、`params.max_retries=0`、`params.schema_enforced=true`、`params.schema_version="stage_d_structured_output_v1"`、`params.schema_dynamic_cluster_id_enum=true`、schema transport 匹配 backend，且 `code_version` 精确等于 `generation-frozen-G2` tag target 的 run 才能进入实验。
 - 遗留 `status: "running"` 的非当前 run 视为进程中断并作废；没有 `status` 字段的旧 P1 run 属开发数据，一律排除。
@@ -399,6 +424,82 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
   relevance 产出率。G2 正式粒度画像为 Qwen `1/1/2`、Azure `8/11/10`、
   Llama `6/7/15`；原始矩阵顺序与逐文档计数见生成记录。该差异只在参与者
   数据产生后结合任务背景解释，不据此重生成。
+
+### 5.3 Retention coverage
+
+九份正式文档全部满足 `input = kept + filtered`，第三桶为零。三个模型各处理
+58 条输入；按模型的 observed retention 为 Llama `54/58 (93.1%)`、Qwen
+`49/58 (84.5%)`、Azure Mistral `55/58 (94.8%)`。逐文档结果必须与汇总同时
+呈现，因为 Qwen 的 9 条 filtered 中有 5 条来自单一文档
+`P2_task1_batchB`。
+
+同 batch 的输入内容和顺序均配平：
+
+| Batch | Input | Multiset SHA-256 | Sequence SHA-256 |
+| --- | ---: | --- | --- |
+| A | 17 | `c415ea08c3871b1ff5b937c196797c04405cbed0f1fe4691a5142732d489e7b6` | `22a0547afaf9517d1be40b77d5d430309a07c09081742c8fcf2069c2faa37dee` |
+| B | 21 | `eff5d47ad974aac74acf7dec839aba4dd4a3c78b66114e40761d9f39c4d151b3` | `127f865640dd78405638e3bd8dd79f566e4f37c22a20646a9081a3b02a92a3d1` |
+| C | 20 | `a88a44acf6ea4f3c81c7670610451b50ec8ef5032b2f4910ff158714de807b6f` | `99183b4b35e28059ff4e0d31a043f8ebe6f4986a9c09bee44d5094cdfdda1d83` |
+
+Multiset/sequence identity 使用规范化内容 hash，不比较独立 ingest 产生的
+ObjectId。九份文档当前 Mongo natural traversal、ObjectId 插入顺序代理和
+`row_num=1..N` 顺序一致。正式 run 未保存逐 fragment 调用顺序事件日志，
+因此顺序结论属于强重建证据，而非独立历史日志证明。
+
+Retention 不是质量或 accuracy 指标。Relevance filtering 是预期功能；没有
+relevance ground truth 时，不得把较高或较低 retention 解释为更好、更差、
+更激进或更保守。固定表述为：
+
+> Observed retention differed across models; without relevance ground truth,
+> retention cannot be interpreted as accuracy.
+
+Qwen 的较低 observed retention 与 `1/1/2` 粒度可表述为
+*consistent with* 同一 loss-of-discrimination 假设，但不得写成 effect、
+因果关系或已验证机制。
+
+### 5.4 资源画像
+
+正式 generation wall-clock 只从九条冻结 `pipelineRuns` 的起止时间提取。
+正文按秒取整并报告 mean + range：
+
+| Model | 三次正式观察（秒） | Mean | Range |
+| --- | --- | ---: | --- |
+| Llama | 174, 210, 194 | 193 | 174–210 |
+| Qwen | 172, 166, 156 | 165 | 156–172 |
+| Azure Mistral | 65, 40, 49 | 52 | 40–65 |
+
+这些是 observations，不是 benchmarks。毫秒精度只保留在证据 JSON。独立
+instrumentation 中，同一 Batch C 的 Llama 运行约 132 秒，与正式观察相差
+数十秒，证明环境负载/运行状态会产生实质波动。
+
+Peak memory 不是九次冻结生成时同步采样，而是在相同配置与代码状态
+`ddb5355972ca63df44edad184b11e30f420e4c62` 下、独立 `nie_pilot` 副本中的
+separate instrumentation runs。RAM 是 AI + Ollama + `llama-server` 的
+observed working-set；GPU 是 Windows WDDM 下 whole-system used memory，
+不是 per-process VRAM。采样间隔约 0.9–1.0 秒，正文按 0.1 GiB 报告。
+
+| Model | Separate run | Local-stack WS pre/peak | Whole-system GPU pre/peak |
+| --- | ---: | ---: | ---: |
+| Llama | 132 s | 0.6 / 3.1 GiB | 494 / 2781 MiB |
+| Qwen | 93 s | 0.6 / 1.6 GiB | 489 / 2614 MiB |
+
+Llama 在 4096 MiB GPU 上的 whole-system peak 约为 68%，且本地栈峰值约
+3.1 GiB；允许的解释是“消费级硬件可运行，但余量有限”。该 Llama 测量已
+排除活跃 `llama-server`/allocator 残留，但未通过重启清除 OS page cache，
+因此其 RAM 数字在 post-reboot repeat 前标为 provisional。
+
+跨后端时间必须附带限定：本地 wall-clock 包含本地 client/model-loading
+行为；Azure wall-clock 包含网络往返和 GlobalStandard 服务端排队。两者不是
+like-for-like，只能在各自 backend 内比较。
+
+Azure 服务端 RAM/VRAM 对客户端不可见；这属于资源可观测性不对称，而不是
+用本地 client memory 补值。Azure 实际成本仍待 portal usage/token 证据；
+`< $10` 仅为预算上限，不得写成实测。如果本研究规模下实际成本很低，RQ1
+不得主张本研究已证明本地方案更省钱；论证应区分隐私、外部依赖、per-call
+计费和规模化/长期重复使用。
+
+完整逐文档 retention、顺序证据、资源尝试台账、full SHA-256 与失败处置见
+`docs/verification_records/retention_resource_order_audit.md`。
 
 ## 6. PILOT 隔离与正式文档只读规则
 
@@ -463,3 +564,4 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 | 2026-07-25 | 记录首次 Llama smoke 的 `NO_EMBEDDED_FRAGMENTS` 编排失败；固定底层 API 的 `ingest → embed → LLM` 全量计数门禁，并登记历史 `P1_task2_batchB` 同名开发 doc ID 与分析排除规则。 |
 | 2026-07-26 | 记录 G-era 重复 assignment 协议违规、G2 structured-output 仪器、G-era superseded/排除文档、G2 provenance 验收字段及 `G2 → S → audit` 版本结构。 |
 | 2026-07-26 | 回填 G2 9/9 whitelist、全部 generation/smoke 排除记录、eligible-fragment 指标、单簇解释、think-aloud 物理隔离及 PILOT 数据库隔离铁律；建立 operational S 文档。 |
+| 2026-07-29 | 冻结正式 session checkout 为 `ddb5355972ca63df44edad184b11e30f420e4c62`，排除未重新彩排的 readability 候选；补充 fragment-level retention、输入内容/顺序配平、资源画像、精度限制、Azure 可观测性与待办。 |

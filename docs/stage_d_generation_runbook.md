@@ -486,3 +486,53 @@ message 必须逐字等于上述固定值。三层版本关系固定为：
 新任务首先核对 G2 tag 状态、clean worktree 与当前已批准步骤。第 2 节
 manifest 已冻结，不得改动。不得重新使用 G-era 候选、跳过 smoke、直接上传
 其他 CSV 或生成正式文档。
+
+## 11. Session 仪器冻结与分析证据交接
+
+2026-07-29 的 session-instrument 裁定采用“不修改 UI”的路径。正式
+P1/P2/P3 三场固定运行精确 commit：
+
+```text
+ddb5355972ca63df44edad184b11e30f420e4c62
+```
+
+`codex/session-card-readability-v1`、`c5b7354` 与 `2f49694` 是保留但未批准
+的候选，不得进入正式 session。它们包含 full-text inspection、note popover、
+键盘行为与 URL document persistence，不属于可在既有 PILOT 后静默接受的
+纯视觉修改。三场之间任何代码、界面或行为变化都会破坏 participant 间仪器
+一致性；若必须修改，必须在第一场前重新彩排、冻结和审核。
+
+正式 retention 与资源审计已确认：
+
+- A/B/C input 分别为 17/21/20，同 batch 三模型的 fragment multiset 与当前
+  重建处理顺序一致；
+- 三模型各接收 58 条平衡输入；
+- 九份文档均满足 `input = kept + filtered`，第三桶为零；
+- retention 只描述 relevance 产出，不是 accuracy/quality；
+- 正式 wall-clock 从冻结 `pipelineRuns` 提取，正文只报整数秒；
+- local peak memory 来自 separate instrumentation，而非九次正式生成；
+- Azure 服务端 RAM/VRAM 不可观测，实际货币成本仍待 portal 证据；以及
+- Llama process-clean RAM 结果在 post-reboot repeat 前保持 provisional。
+
+完整数字、全长 SHA-256、顺序重建限制和资源失败尝试见：
+
+```text
+docs/verification_records/retention_resource_order_audit.md
+```
+
+当前关键路径：
+
+1. session 仪器二选一已经关闭，裁定为固定 `ddb53559...`；
+2. 正式招募、录音、参与者联系和数据收集仍等待 FEC 最终批准；
+3. Azure portal cost 与 post-reboot Llama memory repeat 是写作/RQ1 证据
+   待办，不授权修改 session 仪器，也不允许延伸成新的正式 generation；
+4. 若在第一场前重新提出任何 UI/code 变更，session 日期安排立即重新阻塞，
+   直到新仪器完成 PILOT、冻结和审核；以及
+5. 第一场开始后直至 P3 结束，仪器不可变。
+
+后续任务除第 10 节七个文件外，还必须读取：
+
+```text
+docs/verification_records/stage_d_g2_generation.md
+docs/verification_records/retention_resource_order_audit.md
+```
