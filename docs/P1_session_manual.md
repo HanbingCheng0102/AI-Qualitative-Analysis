@@ -543,10 +543,10 @@ separate instrumentation runs。RAM 是 AI + Ollama + `llama-server` 的
 observed working-set；GPU 是 Windows WDDM 下 whole-system used memory，
 不是 per-process VRAM。采样间隔约 0.9–1.0 秒，正文按 0.1 GiB 报告。
 
-| Model | Separate run | Local-stack WS pre/peak | Whole-system GPU pre/peak |
-| --- | ---: | ---: | ---: |
-| Llama | 123 s | 0.6 / 3.1 GiB | 428 / 2730 MiB |
-| Qwen | 93 s | 0.6 / 1.6 GiB | 489 / 2614 MiB |
+| Model | Separate runs | Local-stack WS peaks | Whole-system GPU allocation deltas |
+| --- | --- | --- | --- |
+| Llama | 132, 123 s | 3.1, 3.1 GiB | 2287, 2302 MiB |
+| Qwen | 93, 90 s | 1.6, 1.6 GiB | 2125, 2142 MiB |
 
 2026-07-30 资源更新：post-reboot Llama repeat 与先前 process-clean run 的
 local-stack working-set peak 只相差 0.0225%，GPU allocation delta 只相差
@@ -554,6 +554,14 @@ local-stack working-set peak 只相差 0.0225%，GPU allocation delta 只相差
 observation；采用的 post-reboot wall-clock 为 123 秒，whole-system GPU peak
 为 2730 MiB，约占 4096 MiB 的 67%。允许的解释是“消费级硬件可运行，但余量
 有限”；它仍不是九次冻结生成期间的同步测量，也不是 benchmark。
+
+同日 Qwen post-reboot repeat 与先前 process-clean run 的 local-stack
+working-set peak 相差 0.0507%，GPU allocation delta 相差 17 MiB，
+wall-clock 为 90 与 93 秒。两模型现均有两次有效独立观测；Llama/Qwen
+host WS peak 均值比为 1.931，但**差异原因没有被分离**，不得归因于模型文件
+大小、量化格式、卸载切分或 buffer 分配。Ollama runtime 细节只作描述，
+不能写成因果解释；硬件可运行性的主证据使用 GPU 占用/余量，host WS 只说明
+本机系统 RAM 下的实际 fit。
 
 Azure 实际成本仍不可用：当前 researcher account 无权查看或导出 Portal
 usage、token 或 billing 证据。这不表示成本为零，也不得用估算值代替缺失的
@@ -655,3 +663,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-07-26 | 回填 G2 9/9 whitelist、全部 generation/smoke 排除记录、eligible-fragment 指标、单簇解释、think-aloud 物理隔离及 PILOT 数据库隔离铁律；建立 operational S 文档。 |
 | 2026-07-29 | 冻结正式 session checkout 为 `ddb5355972ca63df44edad184b11e30f420e4c62`，排除未重新彩排的 readability 候选；补充 fragment-level retention、输入内容/顺序配平、资源画像、精度限制、Azure 可观测性与待办。 |
 | 2026-07-30 | 在任何正式 session 开始前预注册：浏览器失败日志与 `N` integrity figure 的非零处置、六项一致性检查及第 5/6 项的 move-only 作用域、first-pass clustering assistance 构念边界、固定顺序与 45 分钟停止/逐文档计时规则。 |
+| 2026-07-30 | 在同一固定代码、20-input Batch C、零预加载模型与冻结参数下完成 Qwen post-reboot repeat；Llama/Qwen 各保留两次有效资源观测，并冻结“只报观察值、差异原因未分离”的解释边界。 |

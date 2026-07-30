@@ -162,34 +162,45 @@ Required Methods statement:
 > Peak memory figures were captured in separate instrumentation runs under the
 > same configuration and code state, not during the frozen generation runs.
 
-Both accepted local-model measurements used a fresh restored `nie_pilot`, the
-same 20-input Batch C document, no preloaded Ollama model, and the frozen
-temperature, seed, token, timeout, retry, prompt, and schema settings. The
-accepted Llama value is now the post-reboot repeat; the earlier process-clean
-run is retained as an independent comparison.
+The four valid local-model observations (two per model) used a fresh restored
+`nie_pilot`, the same 20-input Batch C document, no preloaded Ollama model, and
+the frozen temperature, seed, token, timeout, retry, prompt, and schema
+settings. Each model now has one earlier process-clean observation and one
+post-reboot, model-cold repeat.
 
 RAM is the observed working-set sum of the AI process, Ollama, and
 `llama-server`. GPU is whole-system used memory under Windows WDDM rather than
 per-process VRAM. Actual sampling cadence was approximately 0.9–1.0 seconds;
 body text rounds RAM to 0.1 GiB.
 
-| Model | Separate run (s) | Local-stack WS pre/peak | Whole-system GPU pre/peak |
-| --- | ---: | ---: | ---: |
-| `llama3.2:3b` | 123 | 0.6 / 3.1 GiB | 428 / 2730 MiB |
-| `qwen2.5:3b` | 93 | 0.6 / 1.6 GiB | 489 / 2614 MiB |
+| Model | Separate runs (s) | Local-stack WS peak observations | Whole-system GPU allocation deltas |
+| --- | --- | --- | --- |
+| `llama3.2:3b` | 132, 123 | 3.1, 3.1 GiB | 2287, 2302 MiB |
+| `qwen2.5:3b` | 93, 90 | 1.6, 1.6 GiB | 2125, 2142 MiB |
 
-The Llama GPU peak is approximately 67% of the installed 4096 MiB. Together
-with a 3.1 GiB observed local-stack working set on a 7.92 GiB machine, this
-supports the bounded statement that the model ran on consumer hardware but
-with limited headroom.
+Pre-request local-stack working set was approximately 0.6 GiB in all four
+observations. The post-reboot Llama whole-system GPU peak was 2730 MiB,
+approximately 67% of the installed 4096 MiB. Together with a 3.1 GiB observed
+local-stack working set on a 7.92 GiB machine, this supports the bounded
+statement that the model ran on consumer hardware but with limited headroom.
 
-The host-memory difference is not inferred from model file size alone. Ollama
-runtime logs show:
+The mean observed host working-set peak was 3,371,132,928 bytes for Llama and
+1,745,391,616 bytes for Qwen, a ratio of 1.931. The cause of this difference
+was not isolated and must not be inferred from model file size or attributed to
+a specific runtime mechanism. For descriptive context only, Ollama runtime
+logs show:
 
 - Llama offloaded 26/29 layers, retained a 484.22 MiB CUDA-host model buffer,
   and allocated a 48 MiB CPU KV buffer; and
 - Qwen offloaded 37/37 layers, retained a 243.43 MiB CUDA-host model buffer,
   and reported no CPU KV buffer.
+
+These log differences are not a causal decomposition of the host-memory
+difference. The GPU allocation deltas were much closer (means 2294.5 MiB and
+2133.5 MiB respectively), so the resource comparison reports the observed
+values without explaining their cause. The GPU column carries the primary
+hardware-fit claim; the host working set only answers whether the observed
+local stack fit within the installed system RAM.
 
 The post-reboot Llama repeat recorded OS boot time
 `2026-07-30T10:08:44.5000000Z`, zero preloaded Ollama models, a 20/20 restored
@@ -205,6 +216,20 @@ working-set peaks of 3,370,754,048 and 3,371,511,808 bytes respectively: a
 than provisional and is not explained by live residual model processes. The
 wall-clock observations still differed (132 versus 123 seconds), reinforcing
 that these runs are observations rather than benchmarks.
+
+The post-reboot Qwen repeat recorded OS boot time
+`2026-07-30T11:40:36.5000000Z`, zero preloaded Ollama models, a 20/20 restored
+document, `cloud_keys_present=false`, and the same exact code version. It
+completed with no `failure_*`, passed every frozen pipeline/provenance check,
+and left 27017, 27018, 8000, and 11434 without listeners. The earlier and
+post-reboot observations produced local-stack working-set peaks of
+1,744,949,248 and 1,745,833,984 bytes: a 0.0507% difference. Their GPU
+allocation deltas were 2,125 and 2,142 MiB: a 17 MiB difference; wall-clock
+was 93 and 90 seconds. Qwen's 1.6 GiB observation is therefore independently
+repeated rather than a single-run anomaly.
+
+The comparison is now balanced at two valid observations per model. It remains
+an instrumentation observation, not a benchmark or causal experiment.
 
 ## Instrumentation attempt ledger
 
@@ -225,6 +250,8 @@ or a model/protocol error.
 | `20260730_115010_llama_reboot_cold_attempt4` | 1,592 documents restored, but preflight queried fragment foreign key `doc_id` instead of the frozen loader's `docid` | retained setup-only failure; no Ollama/AI/model request |
 | `20260730_115140_llama_reboot_cold_attempt5` | restored document passed 20/20; Ollama started with zero loaded models, but cold AI import exceeded the initial 45-second startup gate | retained setup-only failure; no `/api/generate` or pipeline request |
 | `20260730_120753_llama_reboot_cold_attempt6` | post-reboot, zero preloaded models, fresh restored DB, completed and passed all frozen pipeline/provenance checks | accepted Llama resource measurement |
+| `20260730_130143_qwen_reboot_cold` | 8000 was visibly listening, but the original `Get-NetTCPConnection` gate returned a false negative and timed out | retained setup-only failure; no state, model request, or `pipelineRuns`; exact recorded PIDs stopped and all four ports cleared |
+| `20260730_130800_qwen_reboot_cold_attempt2` | listener detection changed to parse the actual `netstat` PID; post-reboot, zero preloaded models, fresh restored DB, completed and passed all frozen pipeline/provenance checks | accepted Qwen repeat |
 
 The attempt suffixes therefore express a fail-loud measurement history rather
 than result selection. Invalid attempts remain preserved and are explicitly
@@ -276,6 +303,13 @@ All hashes are full SHA-256 values.
 | Accepted post-reboot Llama validation | `D08C03FD98F8D1D238CF4F47B3BAD36698E93384D85909666178B819803B48A4` |
 | Post-reboot comparison | `C5E3BC9D1A1B382817F531E1451307219334451320236D4FFBE416810743650D` |
 | Post-reboot additive evidence manifest | `CA99F18A86EB1A284384E55A64BAC16382F025C4DE8E2DEDD80A986B3B5EB2CC` |
+| Qwen repeat setup-only failure manifest | `8849335D5CD915438F57B15B9E918B5FC0F81E30F50FEBD81601BC98A29F883A` |
+| Accepted post-reboot Qwen summary | `DA914CA34C3BCCF889A1FF23C0FD8DA8EBDB9BCBACC7E2E236CE223AD0A12565` |
+| Accepted post-reboot Qwen samples | `CE34777E50088231FE4691472AE652E6DE943B4EC8810C7926AAE144A2DA9FF6` |
+| Accepted post-reboot Qwen validation | `D08C03FD98F8D1D238CF4F47B3BAD36698E93384D85909666178B819803B48A4` |
+| Accepted post-reboot Qwen state | `407104117B2C930506ADAFBAFA58EBAD3D6B1ACC996AD244C2F39628A4DE5929` |
+| Accepted post-reboot Qwen shutdown | `564DD7699EC29BE04A4A799E556DF32727A86B41E636DF520A7BAA5A267D572E` |
+| Accepted post-reboot Qwen evidence manifest | `C5839D94D2605CFE936FE453046D3DB61095F41E53C5F67C74B9FD056157C21A` |
 
 The ignored audit scripts were anchored at:
 
@@ -285,4 +319,6 @@ The ignored audit scripts were anchored at:
 | `formal_fragment_order_audit.py` | `041B85827214991A1440C41434C37E17DD310FBCEA70FFAB23F8479A7A1A1C2D` |
 | `resource_instrumentation_run.py` | `227FCD73A3BB82C6B5209D20E7414D8345F2ACFB5EEC78B7F111EE2EE949C918` |
 | `run_llama_reboot_cold.ps1` (accepted attempt6) | `EB55F47BFE51A44D5581A31263DBB0A291CFD2433E51C50DC5A30BEDB405BC0A` |
+| Qwen orchestration variant (setup-only first attempt) | `19DC119AD88136330245AE410224E8B43267A4687F7708D9F1BA93853B2F312E` |
+| Qwen orchestration variant (accepted `_attempt2`) | `D46289D884AC68B5167A484792CD6BD41281A1E5831C495F7DE865F404D7CFC8` |
 
