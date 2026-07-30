@@ -187,6 +187,20 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 
 - `localStorage` 按同一 browser origin 跨 session 保留，不能依赖它自动按 participant 隔离。
 
+### 1.7 固定顺序、45 分钟上限与计时
+
+- 三份正式文档的审查段总上限为 **45 分钟**。计时从第一份文档完成加载、
+  researcher 宣布可以开始审查时开始；第三份文档结束或总计时达到 45 分钟时
+  结束，以先发生者为准。Consent、录音设置和结束检查不计入这 45 分钟。
+- 文档顺序使用第 1.1 节正式矩阵中 participant 的 task1 → task2 → task3
+  顺序；该顺序是预先固定的 Latin-square 分配，**session 内不再随机化**，
+  也不因前一份文档的粒度、完成度或参与者反应而调换。
+- Researcher 记录审查段总开始/结束时间，并为每份文档分别记录
+  `doc_id`、开始时间与结束时间；时间使用带时区的 ISO 8601。
+- 达到 45 分钟时立即停止，不要求完成当前卡片或当前文档，不补时、不加速
+  提示，也不在 session 后补做。尚无有效 feedback 的 eligible fragments
+  仍按第 5.1 节记为 `no recorded decision (reject-or-unreviewed)`。
+
 ## 2. Session 中现场处理
 
 开始参与者任务前，researcher 开始录音，并口头确认 participant 已阅读 information sheet、已签署 consent form 且同意本次录音。
@@ -298,6 +312,8 @@ ts, participant, action, doc_id, fragment_id, http_status, message
 
 - 将日志内容归入本场 session 记录，即使结果为 `null` 或空数组也要记载。
 - 核对现场记录中的卡片弹回、409 或服务中断是否均有对应日志。
+- 记录本场原始失败条目数 `N`；`N` 的作用和非零处置按第 5.2 节执行。
+- 将审查段总开始/结束时间及三份文档各自的开始/结束时间归入本场记录。
 - 在下一场 session 前，完成导出后再清空 localStorage。
 
 ## 4. 命名与身份规范
@@ -425,6 +441,55 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
   Llama `6/7/15`；原始矩阵顺序与逐文档计数见生成记录。该差异只在参与者
   数据产生后结合任务背景解释，不据此重生成。
 
+#### 5.2.1 失败日志与 integrity figure
+
+- `nieFeedbackProvenanceErrors` 原始导出是“浏览器已观察到 feedback 请求
+  失败”的权威记录；MongoDB 是“已成功持久化 action”的权威记录。两者职责
+  不互相替代，不能仅因数据库中没有 action 就把失败日志解释为没有发生失败。
+- `N` 固定定义为本场 session 原始错误日志中，participant 与正式身份一致、
+  `doc_id` 属于该 participant 三份 whitelist 文档、且 action 为
+  `confirm` 或 `move` 的条目数。`N` 是 integrity figure，不去重、不根据
+  HTTP status 或后续数据库状态删减；按 participant 报告，并汇总报告总数。
+- `N=0` 只允许表述为“没有浏览器观察到的 feedback 提交失败”，不能证明
+  系统不存在未观测故障。`N>0` 时不得静默重试、删除或把失败 action 改记为
+  成功；保留原始日志，逐条与 MongoDB、现场笔记和时间戳对账。
+- 对账后，只有 MongoDB 中有效持久化的 action 进入 confirm/move 计算。
+  未成功持久化的失败 action 不进入分子；若该 fragment 没有其他有效 action，
+  它保留为 `no recorded decision`。报告 `N`、失败类型、受影响文档/fragment
+  数及处置。若下列一致性检查任一失败，暂停该 participant-document 的定量
+  分析并单独裁定；不得事后修库来制造通过。
+
+#### 5.2.2 六项一致性检查
+
+正式分析前按 participant-document 运行并保存以下六项 PASS/FAIL/NA：
+
+1. **Whitelist/run 身份：**doc 精确位于九文档 whitelist，且唯一批准的
+   `pipelineRuns` 为 completed G2 run；model、batch、params 与 run ID
+   均匹配。
+2. **Participant 与 eligible 范围：**feedback participant 精确为该场
+   `P1`/`P2`/`P3`，doc 属于其固定矩阵；每个 feedback fragment 属于该 doc
+   的 eligible fragment 集，不混入 filtered、PILOT、TEST 或开发记录。
+3. **Action 与引用完整性：**正式定量 action 只含 `confirm`/`move`；所有
+   doc、fragment、from/to cluster 引用存在且属于同一正式文档；move 的
+   from/to 不相同。
+4. **Latest-state 与算术闭合：**按 `{timestamp:-1,_id:-1}` 取最后有效
+   action 后，`confirm + move + no recorded decision = eligible`，三个桶
+   互斥；事件总数不得小于有记录的 distinct fragment 数。
+5. **Move 事件链连续性：**仅对至少有一条有效 move 的 fragment 检查。按
+   `{timestamp:1,_id:1}` 排序后，首条 move 的 `from_cluster_id` 是该
+   participant 操作前的 assignment；后续每条 move 的 from 必须等于前一条
+   move 的 to。没有 move 的 confirm-only 或未审查 fragment 记为 `NA`，
+   不能因不适用而判 FAIL。
+6. **Move 后数据库投影：**仅对发生过 move 的 fragment 及其受影响 clusters
+   检查。fragment 当前 `cluster_id`/`feedback_cluster_id`、最后一条 move
+   的 `to_cluster_id` 与 cluster `fragment_ids` membership 必须一致，且
+   该 fragment 只属于一个当前 cluster。未受 move 影响的 fragment/clusters
+   不属于本项覆盖范围；本项不声称验证整个数据库或模型输出质量。
+
+检查 5/6 是针对 recluster 副作用与事件链的完整性门禁，不是参与者判断或
+cluster 质量指标。任一适用检查为 FAIL 时，保存原始证据并暂停分析；不得把
+FAIL 改记为 `NA`，也不得用清理数据的方式使检查通过。
+
 ### 5.3 Retention coverage
 
 九份正式文档全部满足 `input = kept + filtered`，第三桶为零。三个模型各处理
@@ -508,6 +573,23 @@ usage/token/billing，因此 Azure 实际成本记为 unavailable，而不是零
 完整逐文档 retention、顺序证据、资源尝试台账、full SHA-256 与失败处置见
 `docs/verification_records/retention_resource_order_audit.md`。
 
+### 5.5 Coding 与 clustering 构念边界
+
+本研究评估的是 **first-pass clustering assistance**：模型先为 fragments
+提供候选分组与 placement，参与者再审查这些 placement。它不是完整 qualitative
+coding、主题命名/解释或 reflexive thematic analysis 的替代。
+
+`confirm` 只表示参与者在该时刻明确认可“该 fragment 当前位于这个 cluster”
+这一 placement。它不表示参与者认可整个模型、cluster label、主题解释、
+relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragment
+显式纠正到另一个现有 cluster；界面没有独立 split、merge 或创建新 code/theme
+的动作。无记录仍是 `no recorded decision (reject-or-unreviewed)`。
+
+因此 Results 只能把 confirm/move 指标解释为候选 clustering placement 的
+确认覆盖率下界与显式纠正率；不得把它们表述为完整接受率、编码质量、主题
+有效性或模型 accuracy。稳定编号的预注册表述见
+`docs/verification_records/formal_session_preregistration.md` 第 §12 节。
+
 ## 6. PILOT 隔离与正式文档只读规则
 
 - 九个正式 whitelist 文档从 S 建立起到正式 session 结束均视为只读生成
@@ -572,3 +654,4 @@ usage/token/billing，因此 Azure 实际成本记为 unavailable，而不是零
 | 2026-07-26 | 记录 G-era 重复 assignment 协议违规、G2 structured-output 仪器、G-era superseded/排除文档、G2 provenance 验收字段及 `G2 → S → audit` 版本结构。 |
 | 2026-07-26 | 回填 G2 9/9 whitelist、全部 generation/smoke 排除记录、eligible-fragment 指标、单簇解释、think-aloud 物理隔离及 PILOT 数据库隔离铁律；建立 operational S 文档。 |
 | 2026-07-29 | 冻结正式 session checkout 为 `ddb5355972ca63df44edad184b11e30f420e4c62`，排除未重新彩排的 readability 候选；补充 fragment-level retention、输入内容/顺序配平、资源画像、精度限制、Azure 可观测性与待办。 |
+| 2026-07-30 | 在任何正式 session 开始前预注册：浏览器失败日志与 `N` integrity figure 的非零处置、六项一致性检查及第 5/6 项的 move-only 作用域、first-pass clustering assistance 构念边界、固定顺序与 45 分钟停止/逐文档计时规则。 |
