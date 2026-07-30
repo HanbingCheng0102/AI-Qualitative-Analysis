@@ -1,10 +1,11 @@
 # Formal Retention, Input-Order, and Resource Audit
 
 Status: retention and input-order evidence accepted; formal timing accepted;
-Qwen resource measurement accepted; Llama cold-boot repeat and Azure cost
-remain open.
+Qwen resource measurement accepted; post-reboot Llama repeat accepted. Azure
+actual cost is unavailable because the current researcher account cannot view
+or export the required Portal usage/billing evidence.
 
-Date: 2026-07-29
+Date: 2026-07-29; updated 2026-07-30
 
 ## Scope and gates
 
@@ -125,10 +126,10 @@ whole seconds in prose/tables; full precision remains in the external JSON.
 | `qwen2.5:3b` | 172, 166, 156 | 165 | 156–172 |
 | `Mistral-Large-3` | 65, 40, 49 | 52 | 40–65 |
 
-These are observations, not benchmarks. A separate Llama instrumentation run
-on the same 20-input Batch C document took 132 seconds, showing that
-environmental/run-to-run variation is large enough to make millisecond
-reporting misleading.
+These are observations, not benchmarks. Two valid separate Llama
+instrumentation runs on the same 20-input Batch C document took 132 and 123
+seconds, showing that environmental/run-to-run variation is large enough to
+make millisecond reporting misleading.
 
 Required comparability statement:
 
@@ -161,9 +162,11 @@ Required Methods statement:
 > Peak memory figures were captured in separate instrumentation runs under the
 > same configuration and code state, not during the frozen generation runs.
 
-Both accepted local measurements used a fresh restored `nie_pilot`, the same
-20-input Batch C document, no preloaded Ollama model, and the frozen
-temperature, seed, token, timeout, retry, prompt, and schema settings.
+Both accepted local-model measurements used a fresh restored `nie_pilot`, the
+same 20-input Batch C document, no preloaded Ollama model, and the frozen
+temperature, seed, token, timeout, retry, prompt, and schema settings. The
+accepted Llama value is now the post-reboot repeat; the earlier process-clean
+run is retained as an independent comparison.
 
 RAM is the observed working-set sum of the AI process, Ollama, and
 `llama-server`. GPU is whole-system used memory under Windows WDDM rather than
@@ -172,10 +175,10 @@ body text rounds RAM to 0.1 GiB.
 
 | Model | Separate run (s) | Local-stack WS pre/peak | Whole-system GPU pre/peak |
 | --- | ---: | ---: | ---: |
-| `llama3.2:3b` | 132 | 0.6 / 3.1 GiB | 494 / 2781 MiB |
+| `llama3.2:3b` | 123 | 0.6 / 3.1 GiB | 428 / 2730 MiB |
 | `qwen2.5:3b` | 93 | 0.6 / 1.6 GiB | 489 / 2614 MiB |
 
-The Llama GPU peak is approximately 68% of the installed 4096 MiB. Together
+The Llama GPU peak is approximately 67% of the installed 4096 MiB. Together
 with a 3.1 GiB observed local-stack working set on a 7.92 GiB machine, this
 supports the bounded statement that the model ran on consumer hardware but
 with limited headroom.
@@ -188,10 +191,20 @@ runtime logs show:
 - Qwen offloaded 37/37 layers, retained a 243.43 MiB CUDA-host model buffer,
   and reported no CPU KV buffer.
 
-The accepted Llama attempt began with zero matching model processes and a
-whole-system GPU baseline near 0.45 GiB. It was process-clean but not
-reboot-cold; the OS file/page cache was not independently flushed. Its 3.1 GiB
-value remains provisional until a post-reboot repeat confirms or revises it.
+The post-reboot Llama repeat recorded OS boot time
+`2026-07-30T10:08:44.5000000Z`, zero preloaded Ollama models, a 20/20 restored
+document, `cloud_keys_present=false`, and exact code version
+`ddb5355972ca63df44edad184b11e30f420e4c62`. It completed with no
+`failure_*`, then shut down all recorded processes and left ports 27017, 27018,
+8000, and 11434 without listeners.
+
+The previous process-clean run and post-reboot repeat produced local-stack
+working-set peaks of 3,370,754,048 and 3,371,511,808 bytes respectively: a
+0.0225% difference. Their GPU allocation deltas were 2,287 and 2,302 MiB: a
+15 MiB difference. The 3.1 GiB Llama observation is therefore confirmed rather
+than provisional and is not explained by live residual model processes. The
+wall-clock observations still differed (132 versus 123 seconds), reinforcing
+that these runs are observations rather than benchmarks.
 
 ## Instrumentation attempt ledger
 
@@ -204,8 +217,14 @@ or a model/protocol error.
 | `20260729_225402_llama`, launcher attempt | Windows argument quoting failed before HTTP request | retained; no model load or `pipelineRuns` record |
 | `20260729_225402_llama`, first HTTP measurement | SSE consumer treated bytes as string and crashed; isolated-copy run remained `running` | retained; invalid; never used |
 | `20260729_230600_llama_attempt2` | pipeline completed, but RAM sampler omitted `llama-server`; two runner processes were subsequently found and stopped | retained; wall-clock diagnostic only; RAM rejected |
-| `20260729_231409_llama_attempt3` | fresh DB/processes, zero residual model processes, completed | accepted as process-clean; Llama RAM provisional pending reboot-cold repeat |
+| `20260729_231409_llama_attempt3` | fresh DB/processes, zero residual model processes, completed | retained as accepted process-clean comparison |
 | `20260729_231932_qwen` | fresh DB/processes, completed | accepted |
+| `20260730_114151_llama_reboot_cold_preflight_failed` | host/elevated preflight saw an otherwise hidden 11434 listener; no run root, database, service, request, or `pipelineRuns` record was created | retained setup-only evidence |
+| `20260730_114512_llama_reboot_cold_attempt2_preflight_failed` | identified reboot auto-started Ollama Desktop and its `ollama.exe serve` child; `/api/ps` reported zero loaded models | retained; exact two PIDs cleared and 11434 observed empty for 10 seconds |
+| `20260730_114744_llama_reboot_cold_attempt3` | orchestration passed the database subdirectory rather than its parent to `mongorestore`; zero documents restored | retained setup-only failure; no Ollama/AI/model request |
+| `20260730_115010_llama_reboot_cold_attempt4` | 1,592 documents restored, but preflight queried fragment foreign key `doc_id` instead of the frozen loader's `docid` | retained setup-only failure; no Ollama/AI/model request |
+| `20260730_115140_llama_reboot_cold_attempt5` | restored document passed 20/20; Ollama started with zero loaded models, but cold AI import exceeded the initial 45-second startup gate | retained setup-only failure; no `/api/generate` or pipeline request |
+| `20260730_120753_llama_reboot_cold_attempt6` | post-reboot, zero preloaded models, fresh restored DB, completed and passed all frozen pipeline/provenance checks | accepted Llama resource measurement |
 
 The attempt suffixes therefore express a fail-loud measurement history rather
 than result selection. Invalid attempts remain preserved and are explicitly
@@ -214,9 +233,11 @@ excluded.
 ## Azure cost and resource observability
 
 The "`< $10`" value is a budget ceiling, not an observed cost. The formal
-`pipelineRuns` records do not contain token or billing fields. Actual Azure
-cost remains open until the portal usage/cost export for the formal window is
-available.
+`pipelineRuns` records do not contain token or billing fields. As of
+2026-07-30, the current researcher account does not have permission to view or
+export Azure Portal usage, token, or billing data for the formal window.
+Actual cost is therefore unavailable, not zero. No fragment-count-based cost
+estimate may be substituted for Portal evidence.
 
 If the observed formal cost is small, RQ1 must not claim that this study
 demonstrated a monetary advantage for local models. The local-case argument
@@ -244,6 +265,17 @@ All hashes are full SHA-256 values.
 | Accepted Llama samples | `D810B54BDAE5F6A5C6E0F27983F9F432CDAD750C6D1DFBD3E010E9F8A32A4547` |
 | Accepted Qwen summary | `8783DEF5F2DF216311AF6662C27A4A7C6F6ACD13253AF6278E039B0F0F83BB83` |
 | Accepted Qwen samples | `89737381A2707E60EBE3AD0D7117F3ACD5F35E006D07EEB7710FFC7BC60C588F` |
+| Reboot-repeat first preflight failure | `E5CB2BE7DB1B6FCE7F43B97E358B5120B0DC57B51B979C6B747FCF79EFB4FE49` |
+| Reboot-repeat attempt2 preflight failure | `8311BB7E87586058B6B90299DBB31F807EE0EFD9A6BFCB4D29ED98B51451C96B` |
+| Reboot-repeat exact-PID clearance | `579B53EEE169C24CFDF4A942332DF500B2373014A3FBE9FEAF662E09FAEB028C` |
+| Reboot-repeat attempt3 evidence manifest | `5000A53F0AE4B1E273A36FB728405E9CFD2912572DFCE69F7022584B3886BDD4` |
+| Reboot-repeat attempt4 evidence manifest | `E47FA918BE6922BCF49E9C31C47CD299B2CDCA674F8F79FE8991CE9BF4323E25` |
+| Reboot-repeat attempt5 evidence manifest | `1D954A1879C1F729810AD50748FD0DAA9DA6CDC6DC6C2D25B038BCD2DBE5735C` |
+| Accepted post-reboot Llama summary | `FF863143A2B111FE995BF5F55CC681873D2830BBA916DBCFFA71E2AD65EBAF1C` |
+| Accepted post-reboot Llama samples | `97F3D7266131B7450579E0B1B3DC2BBA60993B03C383B14E65539B2FDC2404E0` |
+| Accepted post-reboot Llama validation | `D08C03FD98F8D1D238CF4F47B3BAD36698E93384D85909666178B819803B48A4` |
+| Post-reboot comparison | `C5E3BC9D1A1B382817F531E1451307219334451320236D4FFBE416810743650D` |
+| Post-reboot additive evidence manifest | `CA99F18A86EB1A284384E55A64BAC16382F025C4DE8E2DEDD80A986B3B5EB2CC` |
 
 The ignored audit scripts were anchored at:
 
@@ -252,4 +284,5 @@ The ignored audit scripts were anchored at:
 | `formal_retention_resource_audit.py` | `344F43334929FF6EF341915FC682A63461504AC64856D6E6DF32B65CDF0C1BBC` |
 | `formal_fragment_order_audit.py` | `041B85827214991A1440C41434C37E17DD310FBCEA70FFAB23F8479A7A1A1C2D` |
 | `resource_instrumentation_run.py` | `227FCD73A3BB82C6B5209D20E7414D8345F2ACFB5EEC78B7F111EE2EE949C918` |
+| `run_llama_reboot_cold.ps1` (accepted attempt6) | `EB55F47BFE51A44D5581A31263DBB0A291CFD2433E51C50DC5A30BEDB405BC0A` |
 

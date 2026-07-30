@@ -469,8 +469,8 @@ Qwen 的较低 observed retention 与 `1/1/2` 粒度可表述为
 | Azure Mistral | 65, 40, 49 | 52 | 40–65 |
 
 这些是 observations，不是 benchmarks。毫秒精度只保留在证据 JSON。独立
-instrumentation 中，同一 Batch C 的 Llama 运行约 132 秒，与正式观察相差
-数十秒，证明环境负载/运行状态会产生实质波动。
+instrumentation 中，同一 Batch C 的两次有效 Llama 运行约为 132 与 123 秒，
+与正式观察相差数十秒，证明环境负载/运行状态会产生实质波动。
 
 Peak memory 不是九次冻结生成时同步采样，而是在相同配置与代码状态
 `ddb5355972ca63df44edad184b11e30f420e4c62` 下、独立 `nie_pilot` 副本中的
@@ -480,23 +480,30 @@ observed working-set；GPU 是 Windows WDDM 下 whole-system used memory，
 
 | Model | Separate run | Local-stack WS pre/peak | Whole-system GPU pre/peak |
 | --- | ---: | ---: | ---: |
-| Llama | 132 s | 0.6 / 3.1 GiB | 494 / 2781 MiB |
+| Llama | 123 s | 0.6 / 3.1 GiB | 428 / 2730 MiB |
 | Qwen | 93 s | 0.6 / 1.6 GiB | 489 / 2614 MiB |
 
-Llama 在 4096 MiB GPU 上的 whole-system peak 约为 68%，且本地栈峰值约
-3.1 GiB；允许的解释是“消费级硬件可运行，但余量有限”。该 Llama 测量已
-排除活跃 `llama-server`/allocator 残留，但未通过重启清除 OS page cache，
-因此其 RAM 数字在 post-reboot repeat 前标为 provisional。
+2026-07-30 资源更新：post-reboot Llama repeat 与先前 process-clean run 的
+local-stack working-set peak 只相差 0.0225%，GPU allocation delta 只相差
+15 MiB。因此 3.1 GiB 已由 provisional 升为 confirmed separate-instrumentation
+observation；采用的 post-reboot wall-clock 为 123 秒，whole-system GPU peak
+为 2730 MiB，约占 4096 MiB 的 67%。允许的解释是“消费级硬件可运行，但余量
+有限”；它仍不是九次冻结生成期间的同步测量，也不是 benchmark。
+
+Azure 实际成本仍不可用：当前 researcher account 无权查看或导出 Portal
+usage、token 或 billing 证据。这不表示成本为零，也不得用估算值代替缺失的
+Portal 证据。
 
 跨后端时间必须附带限定：本地 wall-clock 包含本地 client/model-loading
 行为；Azure wall-clock 包含网络往返和 GlobalStandard 服务端排队。两者不是
 like-for-like，只能在各自 backend 内比较。
 
 Azure 服务端 RAM/VRAM 对客户端不可见；这属于资源可观测性不对称，而不是
-用本地 client memory 补值。Azure 实际成本仍待 portal usage/token 证据；
-`< $10` 仅为预算上限，不得写成实测。如果本研究规模下实际成本很低，RQ1
-不得主张本研究已证明本地方案更省钱；论证应区分隐私、外部依赖、per-call
-计费和规模化/长期重复使用。
+用本地 client memory 补值。当前 researcher account 无权查看或导出 portal
+usage/token/billing，因此 Azure 实际成本记为 unavailable，而不是零；
+`< $10` 仅为预算上限，不得写成实测，也不得以 fragment 数估算替代。如果
+未来取得证据且本研究规模下实际成本很低，RQ1 不得主张本研究已证明本地方案
+更省钱；论证应区分隐私、外部依赖、per-call 计费和规模化/长期重复使用。
 
 完整逐文档 retention、顺序证据、资源尝试台账、full SHA-256 与失败处置见
 `docs/verification_records/retention_resource_order_audit.md`。

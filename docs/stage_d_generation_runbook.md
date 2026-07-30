@@ -511,8 +511,10 @@ ddb5355972ca63df44edad184b11e30f420e4c62
 - retention 只描述 relevance 产出，不是 accuracy/quality；
 - 正式 wall-clock 从冻结 `pipelineRuns` 提取，正文只报整数秒；
 - local peak memory 来自 separate instrumentation，而非九次正式生成；
-- Azure 服务端 RAM/VRAM 不可观测，实际货币成本仍待 portal 证据；以及
-- Llama process-clean RAM 结果在 post-reboot repeat 前保持 provisional。
+- Azure 服务端 RAM/VRAM 不可观测；当前 researcher account 无权查看或导出
+  portal usage/token/billing，实际货币成本记为 unavailable，而不是零；以及
+- Llama post-reboot repeat 已确认 3.1 GiB separate-instrumentation
+  observation，不再标为 provisional。
 
 完整数字、全长 SHA-256、顺序重建限制和资源失败尝试见：
 
@@ -524,8 +526,9 @@ docs/verification_records/retention_resource_order_audit.md
 
 1. session 仪器二选一已经关闭，裁定为固定 `ddb53559...`；
 2. 正式招募、录音、参与者联系和数据收集仍等待 FEC 最终批准；
-3. Azure portal cost 与 post-reboot Llama memory repeat 是写作/RQ1 证据
-   待办，不授权修改 session 仪器，也不允许延伸成新的正式 generation；
+3. Llama post-reboot repeat 已关闭；Azure portal cost 因当前账号无查看/
+   导出权限而不可获得。该证据缺口不授权修改 session 仪器、估算成本或延伸
+   成新的正式 generation；
 4. 若在第一场前重新提出任何 UI/code 变更，session 日期安排立即重新阻塞，
    直到新仪器完成 PILOT、冻结和审核；以及
 5. 第一场开始后直至 P3 结束，仪器不可变。
@@ -536,3 +539,18 @@ docs/verification_records/retention_resource_order_audit.md
 docs/verification_records/stage_d_g2_generation.md
 docs/verification_records/retention_resource_order_audit.md
 ```
+
+### 11.1 资源交接更新（2026-07-30）
+
+Post-reboot Llama repeat 在同一固定代码状态下完成；它与先前测量的
+local-stack peak 只相差 0.0225%（3,370,754,048 对 3,371,511,808 bytes），
+GPU allocation delta 相差 15 MiB。因此 Llama 的 3.1 GiB
+separate-instrumentation observation 已由 provisional 升为 confirmed。
+accepted attempt 之前的所有 setup-only 失败均保留在验证台账中，且均未发送
+模型请求。
+
+Azure 实际成本仍不可用：当前 researcher account 无权查看或导出 Portal
+usage/token/billing 证据。`< $10` 仍只表示预算上限，不得写成 observed cost。
+本节更新取代前文把 Azure cost 与 Llama post-reboot repeat 同时列为待办的
+表述：Llama 复测已经关闭；仅 Azure 成本证据仍不可获得，且不得用模型估算值
+替代。
