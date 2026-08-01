@@ -2,13 +2,17 @@
 
 本手册用于 P1 provenance 实验的彩排与正式 session。手册与代码在同一仓库、同一分支下版本控制；任何影响 session 行为、记录字段或分析裁定的代码变更，都必须同步更新本手册。
 
-ERGO 115447：导师已批准，当前状态为 `Awaiting FEC Review`（截至 2026-07-18）。正式招募、录音与数据收集必须待 FEC 最终批准。
+ERGO 115447：导师已批准；researcher 于 2026-08-01 目视确认 ERGO/FEC 门户状态显示
+`Approved`。门户未提供独立 PDF 批准函，因此不得虚构 PDF 凭据或把 2026-08-01
+写成批准签发日期；该日期只表示状态的观察日期。正式 session 使用门户状态的
+日期化截图/打印件（若门户允许）或日期化 researcher 核对记录作为批准状态凭据。
 
 ## 1. Session 前检查单
 
 ### 1.1 实验准入
 
-- 已获得 FEC 最终批准。
+- 已获得 FEC 最终批准；门户状态显示 `Approved`。记录核对日期与核对人；无独立
+  PDF 批准函时写明“portal status evidence”，不得把申请表或指导文件冒充批准函。
 - `COMP2300` 教学材料许可状态：导师已在 2026-07-10 例会中口头同意本项目使用；书面确认已收到（截至 2026-07-22）。该材料现可用于阶段 D 正式文档生成；源文件与派生 CSV 仍须保持本地、不得进入 Git。
 - 已确定最终模型：本地 `llama3.2:3b` 与 `qwen2.5:3b`，云端 Azure `Mistral-Large-3`（deployment version `1`、`GlobalStandard`）。
 - 确认 participant information sheet 已发送、consent form 已签署、录音设备已就绪。
@@ -201,6 +205,35 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
   提示，也不在 session 后补做。尚无有效 feedback 的 eligible fragments
   仍按第 5.1 节记为 `no recorded decision (reject-or-unreviewed)`。
 
+### 1.8 固定 session 台本
+
+以下结构与措辞在 P1、P2、P3 三场保持一致。模型名称、本地/云端身份和任何暗示
+条件差异的说明均不得出现在 participant briefing 中；参与者只看到 Batch A/B/C。
+
+1. **接待与知情同意（不计入 45 分钟）**：全部内容按获批 ERGO/PIS/consent
+   文件执行。录音只能在 consent 完成后开始；拒绝录音时能否继续参加按获批文件
+   执行，不临场决定。
+2. **统一 briefing（不计入 45 分钟）**：三场逐字使用以下六点：
+   - AI 已把访谈内容初步分成若干组；请逐条查看，判断 fragment 当前所在组是否合适。
+   - 这是对 **first-pass clustering placement** 的检查，不是要求完成完整的定性
+     coding、主题命名或主题分析。`Confirm` 只表示认可 fragment 当前所在位置，
+     不表示该组是唯一正确解释。
+   - 认可当前位置时点击 `Confirm`；认为应该换组时拖到已有的目标组。若没有合适
+     的目标组，可以自然说出这一点。
+   - 三份文档共用一个 45 分钟计时段；看不完是正常的，不必赶。
+   - 请把心里自然想到的内容说出来。Researcher 不就 split、merge、navigation
+     或判断理由追加追问。
+   - 逐字界面提示：**“本研究关闭了界面的部分功能。你可能会看到一个提到
+     AI suggestions 的进度提示，请忽略它，它不会启用。”**
+3. **熟悉界面（不计入 45 分钟）**：仅使用非正式/演示文档各演示一次 confirm
+   与拖动；不得打开九份正式 whitelist 文档。演示后重新核对 URL participant
+   参数、badge 和第一份正式 doc ID。
+4. **计时任务（45 分钟）**：第一份正式文档加载完成且 researcher 宣布开始时
+   计时。逐文档记录起止时间；参与者自行决定何时进入下一份。45 分钟到立即停止。
+5. **统一结束问题（不计入 45 分钟）**：三场均逐字只问一次：
+   **“整体感受如何？”** Researcher 只记录、不追问；不得询问哪份最好、要求
+   逐文档比较或透露模型身份。
+
 ## 2. Session 中现场处理
 
 开始参与者任务前，researcher 开始录音，并口头确认 participant 已阅读 information sheet、已签署 consent form 且同意本次录音。
@@ -251,6 +284,52 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
   上下文。二者在原始存储、导出文件和分析步骤中均保持分离。
 - 本裁定不授权修改 session 工具。将来若要加入 split/merge 控件或结构化
   观察字段，必须建立新的 instrument 版本，不能作为 S 的补丁。
+
+#### 2.4.1 质性观察记录规格
+
+记录单位是 `participant × document`，不是 participant 总体，也不只记录第一份
+文档。Split/merge 属于 RQ2 粒度背景；navigation 属于 workload/界面背景，三者
+不得合成同一量表或并列解释为同一构念。
+
+编码值固定为：
+
+- `observed`：参与者以言语表达对当前分组粒度的不满、明确的结构改动意愿，或
+  明确的导航/界面负担。
+- `no spontaneous expression recorded`：录音与现场笔记中没有记录到符合标准的
+  自发表达；它**不表示**参与者没有这种感受。
+- `unclear`：评论含糊、语境不足、录音不清或无法可靠归类；必须保留原话和时间点。
+- `n/a (structurally unavailable)`：只允许用于 `cluster_count = 1` 文档的 merge
+  字段，由预填表自动给出，不由 researcher 临场选择。Split 不设簇数阈值，
+  split 与 navigation 均不得记 `n/a`。
+
+`observed` 的边界固定如下：
+
+- “这两个应该分开”等明确拆分意愿记 split `observed`。
+- 在当前分组语境下询问能否新建一组，且表达了把内容分开的意愿，记 split
+  `observed`；教程中的一般功能询问不计。
+- “应该把这两组并在一起”等明确合并意愿记 merge `observed`。
+- “这个组有点杂”等未明确表达拆分或结构改动的评论记 `unclear`，不得追问澄清。
+- 纯 move、停顿、反复浏览或其他无言语行为不构成质性 `observed`；行为数据只由
+  `clusterFeedback` 记录。
+- 明确说出“簇太多、找不到目标、移动/阅读困难”等界面导航负担时，才记
+  navigation `observed`；仅耗时较长不得据此推断。
+
+采用两阶段编码：
+
+1. **现场捕获阶段**：只记录时间点、尽可能接近原话的短记录、最小语境、技术
+   故障与 reflexivity；除表中预印的结构性 merge `n/a` 外，不在现场编码或汇总。
+2. **延迟编码阶段**：三场全部结束后，才依据上述冻结规则为每个 document 填入
+   split、merge、navigation 编码。编码时同时保留录音时间点、原话和 cluster
+   count，不回写 MongoDB，不改变原始观察记录。
+
+质性汇总只陈述具体观察，例如：
+
+> Navigation difficulty was spontaneously mentioned during two document
+> reviews (P1/task2, 11 clusters; P3/task1, 10 clusters).
+
+必须列出具体 participant/task 和簇数；不报告百分比、模型间比较、显著性检验或
+“navigation rate”。`no spontaneous expression recorded` 与结构性 `n/a` 不进入
+同一个分母。
 
 ## 3. Session 后检查单
 
@@ -490,6 +569,18 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 cluster 质量指标。任一适用检查为 FAIL 时，保存原始证据并暂停分析；不得把
 FAIL 改记为 `NA`，也不得用清理数据的方式使检查通过。
 
+版本化只读实现位于
+`docs/verification_tools/formal_session_integrity.py`。脚本把 browser 原始失败
+日志的 integrity `N` 与六项检查、final confirm/move/no-recorded-decision 在
+同一次运行中生成；分析表不得手工填写，也不得先看指标后补算 `N`。脚本只输出
+ID、计数与 PASS/FAIL/NA，不读取或输出 fragment 文本、HTML、embedding、
+research question 或密钥。正式运行必须提供未经编辑的浏览器日志文件；PILOT
+门禁可用其已保存的原始 `null` 证据。
+
+分析表中的 `final confirm` / `final move` 是每个 fragment 依
+`{timestamp:-1,_id:-1}` 得到的裁定终态，不是原始事件数。若同一 fragment
+先 confirm 后 move，终态归 move，但两条原始 provenance 记录均保留。
+
 ### 5.3 Retention coverage
 
 九份正式文档全部满足 `input = kept + filtered`，第三桶为零。三个模型各处理
@@ -664,3 +755,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-07-29 | 冻结正式 session checkout 为 `ddb5355972ca63df44edad184b11e30f420e4c62`，排除未重新彩排的 readability 候选；补充 fragment-level retention、输入内容/顺序配平、资源画像、精度限制、Azure 可观测性与待办。 |
 | 2026-07-30 | 在任何正式 session 开始前预注册：浏览器失败日志与 `N` integrity figure 的非零处置、六项一致性检查及第 5/6 项的 move-only 作用域、first-pass clustering assistance 构念边界、固定顺序与 45 分钟停止/逐文档计时规则。 |
 | 2026-07-30 | 在同一固定代码、20-input Batch C、零预加载模型与冻结参数下完成 Qwen post-reboot repeat；Llama/Qwen 各保留两次有效资源观测，并冻结“只报观察值、差异原因未分离”的解释边界。 |
+| 2026-08-01 | 在第一场正式 session 前记录 ERGO/FEC 门户 `Approved` 状态及无独立 PDF 批准函的证据边界；固定六点 briefing、统一结束问题、participant×document 两阶段质性观察编码、结构性 merge `n/a`、三张空白现场记录表和只读六项一致性检查工具。参与者仪器仍固定为 `ddb5355972ca63df44edad184b11e30f420e4c62`。 |

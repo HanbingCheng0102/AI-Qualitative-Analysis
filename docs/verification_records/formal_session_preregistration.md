@@ -10,11 +10,54 @@
   `7d4e403c60183f75bafc1b5951aa9886f481c8de`
 - Scope: procedural and analytic rules only; no session code, database, prompt,
   schema, formal input, matrix, or participant data change
+- Qualitative-record amendment date: `2026-08-01` (Europe/London), before the
+  first formal participant session
+- Amendment scope: briefing wording, delayed qualitative coding, blank field
+  records, and the uniform closing question; session code endpoint unchanged
 
 The commit containing this file is the timestamped preregistration evidence.
 It supplements the operational S/audit chain without moving the frozen session
 code endpoint. If a formal session has already started when a future rule is
 added, that rule must be labelled post hoc rather than preregistered.
+
+On 2026-08-01 the researcher reported that ERGO/FEC portal status displayed
+`Approved`. No standalone approval-letter PDF was provided by the portal. The
+evidence is therefore described as a dated portal-status observation (and a
+dated screenshot/print if the portal permits), not as a PDF approval letter and
+not as evidence that 2026-08-01 was the approval issue date.
+
+## §2A Qualitative observation record
+
+The observation unit is participant × document. During each session the
+researcher captures only timestamps/audio markers, near-verbatim utterances,
+minimal context, technical incidents, and reflexivity notes. No qualitative
+classification or aggregation is performed between P1, P2, and P3. After all
+three sessions, split, merge, and navigation observations are coded using the
+rules below while preserving the raw note and audio reference.
+
+The fixed codes are `observed`, `no spontaneous expression recorded`, and
+`unclear`. Merge additionally takes `n/a (structurally unavailable)` when and
+only when the document has exactly one cluster; this value is prefilled before
+the session. Split has no cluster-count threshold and split/navigation never
+take `n/a`. Absence of a spontaneous utterance is not evidence that the
+participant did not hold the view.
+
+`observed` requires a verbal expression of dissatisfaction with current
+grouping granularity, an intended structural change, or navigation/interface
+burden. A move or other silent behaviour is not qualitative evidence. An
+ambiguous remark is `unclear` and retains the wording and timestamp; the
+researcher does not ask a clarifying follow-up. Split/merge observations are
+RQ2 granularity context, while navigation observations are workload/interface
+context; they are not a combined scale.
+
+Reporting names the participant/task and document cluster count for each
+observation. It does not report percentages, model comparisons, statistical
+tests, or an observation “rate”. `no spontaneous expression recorded` and
+structural `n/a` never share a denominator.
+
+The same single closing question is asked in all three sessions: “整体感受如何？”
+The response is recorded without follow-up. The researcher does not ask which
+document was best or invite document-by-document comparison.
 
 ## §4 Fixed order and time boundary
 
