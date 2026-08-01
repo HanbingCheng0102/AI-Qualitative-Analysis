@@ -577,6 +577,11 @@ ID、计数与 PASS/FAIL/NA，不读取或输出 fragment 文本、HTML、embedd
 research question 或密钥。正式运行必须提供未经编辑的浏览器日志文件；PILOT
 门禁可用其已保存的原始 `null` 证据。
 
+第一场前的 `nie_pilot` 实跑已于 2026-08-01 完成：三份 P2 彩排文档的检查
+1–4 均为 PASS；无 move 的单簇 task1 在检查 5/6 为预期 `NA`，其余两份文档的
+检查 5/6 均为 PASS；integrity `N=0`。脚本、完整 hash、逐项结果和环境尝试台账见
+`docs/verification_records/formal_session_integrity_pilot_gate.md`。
+
 分析表中的 `final confirm` / `final move` 是每个 fragment 依
 `{timestamp:-1,_id:-1}` 得到的裁定终态，不是原始事件数。若同一 fragment
 先 confirm 后 move，终态归 move，但两条原始 provenance 记录均保留。
