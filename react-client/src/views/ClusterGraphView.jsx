@@ -36,8 +36,8 @@ import {
 
 const THEME_W    = 200;   // theme node width
 const THEME_H    = 110;   // theme node approx height (text + note btn)
-const RESP_W     = 170;   // response card width
-const RESP_H     = 100;   // response card approx height
+const RESP_W     = 240;   // fixed response-card width
+const RESP_H     = 132;   // fixed response-card height; also used by drag hit testing
 const RESP_COLS  = 2;     // response cards per row
 const RESP_GAP_X = 12;    // horizontal gap between response cards
 const RESP_GAP_Y = 12;    // vertical gap between response cards
@@ -321,8 +321,13 @@ function ThemeNode({ data }) {
 function ResponseNode({ data }) {
     const [noteOpen, setNoteOpen]   = useState(false);
     const [note, setNote]           = useState(data.note ?? "");
-    const [textOpen, setTextOpen]   = useState(false);
     const confirmDisabled = data.isConfirmed || data.isConfirming;
+    const detail = {
+        fragId: data.fragId,
+        label: data.label,
+        text: data.text,
+        color: data.color,
+    };
 
     const save = async (val) => {
         setNote(val);
@@ -331,9 +336,11 @@ function ResponseNode({ data }) {
 
     return (
         <div
-            className="relative rounded-lg shadow-sm select-none transition-all"
+            className="relative flex flex-col rounded-lg shadow-sm select-none transition-all
+                       focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
             style={{
                 width: RESP_W,
+                height: RESP_H,
                 background: data.isSnapping ? `${data.color}12` : "#fff",
                 border: data.isConfirmed
                     ? "2px solid #16a34a"
@@ -342,6 +349,25 @@ function ResponseNode({ data }) {
                         : "1px solid #e2e8f0",
                 borderLeft: `4px solid ${data.color}`,
                 transition: "background 0.15s, border-color 0.15s",
+            }}
+            tabIndex={0}
+            aria-label={`Response: ${data.label}`}
+            onPointerEnter={() => data.onInspect?.(detail)}
+            onPointerLeave={() => data.onInspectEnd?.(data.fragId)}
+            onFocus={() => data.onInspect?.(detail)}
+            onBlur={e => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                    data.onInspectEnd?.(data.fragId);
+                }
+            }}
+            onKeyDown={e => {
+                if (
+                    e.target === e.currentTarget &&
+                    (e.key === "Enter" || e.key === " ")
+                ) {
+                    e.preventDefault();
+                    data.onInspectToggle?.(detail);
+                }
             }}
         >
             <Handle type="target" position={Position.Top}    style={{ opacity: 0 }} />
@@ -354,22 +380,24 @@ function ResponseNode({ data }) {
             )}
 
             <div
-                className="px-2 pt-2 pb-1 cursor-pointer"
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); setTextOpen(o => !o); }}
+                className="min-h-0 flex-1 px-2 pt-2 pb-1 cursor-grab active:cursor-grabbing"
+                title="Hover or focus to read the full response"
             >
                 <p className="text-xs font-semibold text-gray-700 truncate">{data.label}</p>
                 <p
-                    className="text-xs text-gray-400 mt-0.5 leading-relaxed"
-                    style={textOpen
-                        ? {}
-                        : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                    className="text-xs text-gray-500 mt-0.5 leading-snug"
+                    style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                    }}
                 >
                     {data.text}
                 </p>
             </div>
 
-            <div className="px-2 pb-2">
+            <div className="flex items-center px-2 pb-2">
                 <button
                     className={`mr-2 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
                         confirmDisabled
@@ -391,25 +419,85 @@ function ResponseNode({ data }) {
                     ✓ Confirm
                 </button>
                 <button
-                    className="text-xs text-blue-400 hover:underline"
+                    className="mr-2 text-[11px] text-blue-500 hover:underline"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => {
+                        e.stopPropagation();
+                        data.onInspectToggle?.(detail);
+                    }}
+                    title="Keep the full response visible"
+                >
+                    Full text
+                </button>
+                <button
+                    className="ml-auto text-[11px] text-blue-400 hover:underline"
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => { e.stopPropagation(); setNoteOpen(o => !o); }}
                 >
                     {noteOpen ? "↑ hide note" : "✎ note"}
                 </button>
                 {noteOpen && (
-                    <textarea
-                        className="w-full mt-1 text-xs border border-gray-200 rounded p-1 resize-none h-14
-                                   focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        value={note}
-                        onChange={e => setNote(e.target.value)}
-                        onBlur={() => save(note)}
+                    <div
+                        className="nodrag nowheel absolute left-0 top-full z-50 mt-1 w-full
+                                   rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
                         onPointerDown={e => e.stopPropagation()}
-                        placeholder="Add a note…"
-                    />
+                    >
+                        <textarea
+                            className="h-14 w-full resize-none rounded border border-gray-200 p-1 text-xs
+                                       focus:outline-none focus:ring-1 focus:ring-blue-300"
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            onBlur={() => save(note)}
+                            placeholder="Add a note…"
+                        />
+                    </div>
                 )}
             </div>
         </div>
+    );
+}
+
+function ResponseInspector({ detail, pinned, onClose }) {
+    if (!detail) return null;
+
+    return (
+        <aside
+            className={`absolute right-4 top-4 z-40 w-96 max-w-[calc(100%-2rem)]
+                        rounded-xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur ${
+                            pinned ? "pointer-events-auto" : "pointer-events-none"
+                        }`}
+            aria-live="polite"
+            aria-label="Full response text"
+            onPointerDown={e => e.stopPropagation()}
+        >
+            <div
+                className="flex items-center gap-2 rounded-t-xl border-b border-slate-100 px-3 py-2"
+                style={{ borderLeft: `4px solid ${detail.color ?? "#94a3b8"}` }}
+            >
+                <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Full response {pinned ? "· pinned" : "· hover preview"}
+                    </p>
+                    <p className="truncate text-xs font-semibold text-slate-700">
+                        {detail.label}
+                    </p>
+                </div>
+                {pinned && (
+                    <button
+                        className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+                        onClick={onClose}
+                        title="Unpin full response"
+                    >
+                        Close
+                    </button>
+                )}
+            </div>
+            <div className="nowheel max-h-[40vh] overflow-y-auto px-4 py-3">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                    {detail.text}
+                </p>
+            </div>
+        </aside>
     );
 }
 
@@ -452,6 +540,9 @@ function GraphInner({ docId, participantId }) {
     const [error, setError]       = useState(null);
     const [feedbackCount, setFeedbackCount] = useState(0);
     const [suggestions, setSuggestions]     = useState([]);
+    const [hoveredResponse, setHoveredResponse] = useState(null);
+    const [pinnedResponse, setPinnedResponse]   = useState(null);
+    const inspectedResponse = pinnedResponse ?? hoveredResponse;
 
     // fragId → clusterId, kept in sync with every reassignment
     const assignmentRef  = useRef({});
@@ -460,6 +551,27 @@ function GraphInner({ docId, participantId }) {
     // Per-fragment queues preserve the order in which provenance actions occurred.
     const feedbackQueueRef = useRef(new Map());
     const pendingConfirmRef = useRef(new Map());
+
+    const inspectResponse = useCallback(detail => {
+        setHoveredResponse(detail);
+    }, []);
+
+    const clearInspectedResponse = useCallback(fragId => {
+        setHoveredResponse(current =>
+            current?.fragId === fragId ? null : current
+        );
+    }, []);
+
+    const togglePinnedResponse = useCallback(detail => {
+        setPinnedResponse(current =>
+            current?.fragId === detail.fragId ? null : detail
+        );
+    }, []);
+
+    useEffect(() => {
+        setHoveredResponse(null);
+        setPinnedResponse(null);
+    }, [docId]);
 
     const queueFeedbackAction = useCallback((fragId, action) => {
         const previous = feedbackQueueRef.current.get(fragId) ?? Promise.resolve();
@@ -507,13 +619,35 @@ function GraphInner({ docId, participantId }) {
         // current screen intact instead of applying a partial projection.
         assignmentRef.current = assignment;
         const { nodes: nextNodes, edges: nextEdges } = buildLayout(cls, fragsByCluster);
+        const inspectableNodes = nextNodes.map(node =>
+            node.type === "responseNode"
+                ? {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        onInspect: inspectResponse,
+                        onInspectEnd: clearInspectedResponse,
+                        onInspectToggle: togglePinnedResponse,
+                    },
+                }
+                : node
+        );
         const confirmedIds = confirmedIdsFromStates(states);
         setClusterList(cls);
-        setNodes(applyConfirmedIdsToNodes(nextNodes, confirmedIds, onConfirm));
+        setNodes(applyConfirmedIdsToNodes(inspectableNodes, confirmedIds, onConfirm));
         setEdges(nextEdges);
         setFeedbackCount(count);
         setSuggestions(nextSuggestions);
-    }, [docId, participantId, setClusterList, setEdges, setNodes]);
+    }, [
+        clearInspectedResponse,
+        docId,
+        inspectResponse,
+        participantId,
+        setClusterList,
+        setEdges,
+        setNodes,
+        togglePinnedResponse,
+    ]);
 
     const confirmFragment = useCallback(async (fragId, clusterId) => {
         if (!docId || !fragId || !clusterId) return;
@@ -841,6 +975,12 @@ function GraphInner({ docId, participantId }) {
                 />
             </ReactFlow>
 
+            <ResponseInspector
+                detail={inspectedResponse}
+                pinned={pinnedResponse !== null}
+                onClose={() => setPinnedResponse(null)}
+            />
+
             {/* Feedback overlay — bottom right */}
             {nodes.length > 0 && (
                 <div className="absolute bottom-4 right-4 z-20 w-72 space-y-2 pointer-events-auto">
@@ -886,11 +1026,68 @@ export default function ClusterGraphView() {
     const location  = useLocation();
     const navigate  = useNavigate();
     const [clusterList] = useAtom(clusters);
-    const [inputVal, setInputVal] = useState(location.state?.doc_id ?? "");
-    const [docId, setDocId]       = useState(location.state?.doc_id ?? null);
+    const queryDocId = new URLSearchParams(location.search).get("docId")?.trim() ?? "";
+    const stateDocId = (location.state?.doc_id ?? "").trim();
+    const initialDocId = queryDocId || stateDocId;
+    const [inputVal, setInputVal] = useState(initialDocId);
+    const [docId, setDocId]       = useState(initialDocId || null);
     const participantId = getParticipant();
 
     const nonNoise = clusterList.filter(c => c.label !== "Uncategorised");
+
+    const selectDocument = useCallback(rawDocId => {
+        const nextDocId = rawDocId.trim();
+        const params = new URLSearchParams(location.search);
+
+        if (nextDocId) {
+            params.set("docId", nextDocId);
+        } else {
+            params.delete("docId");
+        }
+
+        setInputVal(nextDocId);
+        setDocId(nextDocId || null);
+        navigate(
+            {
+                pathname: location.pathname,
+                search: params.toString() ? `?${params.toString()}` : "",
+            },
+            { replace: true },
+        );
+    }, [location.pathname, location.search, navigate]);
+
+    // Older navigation paths pass the document only in transient route state.
+    // Canonicalise that value into the URL so refresh and copied links retain it.
+    useEffect(() => {
+        if (queryDocId || !stateDocId) return;
+
+        const params = new URLSearchParams(location.search);
+        params.set("docId", stateDocId);
+        navigate(
+            {
+                pathname: location.pathname,
+                search: `?${params.toString()}`,
+            },
+            { replace: true },
+        );
+    }, [
+        location.pathname,
+        location.search,
+        navigate,
+        queryDocId,
+        stateDocId,
+    ]);
+
+    // Keep the input and graph in sync when browser back/forward changes the URL.
+    useEffect(() => {
+        if (queryDocId) {
+            setInputVal(queryDocId);
+            setDocId(queryDocId);
+        } else if (!stateDocId) {
+            setInputVal("");
+            setDocId(null);
+        }
+    }, [queryDocId, stateDocId]);
 
     return (
         <>
@@ -919,8 +1116,10 @@ export default function ClusterGraphView() {
                             type="text"
                             value={inputVal}
                             onChange={e => setInputVal(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") setDocId(inputVal.trim() || null); }}
-                            onBlur={() => setDocId(inputVal.trim() || null)}
+                            onKeyDown={e => {
+                                if (e.key === "Enter") selectDocument(inputVal);
+                            }}
+                            onBlur={() => selectDocument(inputVal)}
                             placeholder="Survey doc ID + Enter"
                             className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs
                                        focus:outline-none focus:ring-1 focus:ring-blue-400"
