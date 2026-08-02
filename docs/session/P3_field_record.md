@@ -2,9 +2,10 @@
 
 > Session code endpoint: `ddb5355972ca63df44edad184b11e30f420e4c62`
 >
-> Stage 1 only during the session: record timestamps, near-verbatim utterances,
-> context, technical incidents and reflexivity. Do not code or aggregate the
-> qualitative observations until all P1/P2/P3 sessions are complete.
+> Stage 1 only during the session: record audio timestamps and 3–5 locating
+> keywords, plus operational context/incidents where needed. Do not write an
+> approximate quotation or code/aggregate observations. Exact wording comes
+> only from the transcript after all P1/P2/P3 sessions are complete.
 
 ## Entry and timing
 
@@ -43,9 +44,10 @@
 ## Stage 1 event notes
 
 Record every utterance about grouping structure or interface operation,
-including ambiguous remarks; do not decide `observed` versus `unclear` here.
+including ambiguous remarks, as an audio timestamp plus 3–5 locating keywords.
+Do not write an approximate quotation or decide `observed` versus `unclear` here.
 
-| Timestamp/audio marker | Task | Near-verbatim utterance or visible incident | Minimal context | Technical consequence | Reflexivity note |
+| Audio timestamp | Task | 3–5 locating keywords or visible incident | Minimal context | Technical consequence | Reflexivity note |
 | --- | --- | --- | --- | --- | --- |
 | | | | | | |
 | | | | | | |

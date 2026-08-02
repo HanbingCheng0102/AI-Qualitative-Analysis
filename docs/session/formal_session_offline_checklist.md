@@ -47,10 +47,11 @@ gate. Do not rely on memory or a moving branch name.
 
 - [ ] Each document start/end recorded; order unchanged.
 - [ ] At each document transition, recording indicator visually confirmed active.
-- [ ] Stage-1 notes contain only timestamps, near-verbatim utterances, incidents
-      and reflexivity; no live qualitative coding or metric inspection.
+- [ ] Stage-1 participant-speech notes contain only an audio timestamp and
+      3–5 locating keywords; no approximate quotation or live qualitative code.
 - [ ] Every utterance about grouping structure or interface operation was
-      timestamped even if ambiguous; none was filtered out in the moment.
+      timestamped with locating keywords even if ambiguous; none was filtered
+      out in the moment. Exact wording will come only from the transcript.
 - [ ] At 45 minutes, stopped immediately, or recorded that all three completed first.
 - [ ] Asked exactly once: “整体感受如何？”; no follow-up/comparison question.
 - [ ] Recording stopped and stored under the approved plan.

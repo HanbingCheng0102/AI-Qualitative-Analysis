@@ -4,8 +4,8 @@ This directory contains blank, version-controlled operational templates only.
 
 - Print or retain one offline copy of the checklist per participant.
 - Print the participant-specific field record before that participant's session.
-- Completed forms, near-verbatim utterances, audio timestamps, signatures,
-  participant details, and recordings are research data. They must be stored
+- Completed forms, audio timestamps/locating keywords, signatures, participant
+  details, recordings and transcripts are research data. They must be stored
   only under the approved ERGO data-management plan and must never be committed
   to Git, pasted into issue trackers, or included in routine technical logs.
 - Do not add model names to the participant-facing materials. The researcher
@@ -20,5 +20,6 @@ This directory contains blank, version-controlled operational templates only.
   approximately 10-second test recording by playback before starting the main
   recording, and visually check recording status at every document transition.
 - Timestamp every utterance concerning grouping structure or interface
-  operation, including ambiguous remarks. `observed`/`unclear` coding happens
-  only after all three sessions.
+  operation, including ambiguous remarks, but write only the audio timestamp
+  and 3–5 locating keywords. Exact wording comes from the transcript;
+  `observed`/`unclear` coding happens only after all three sessions.

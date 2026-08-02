@@ -21,6 +21,13 @@
   copies/identities. Database writes are limited to those three excluded demo
   copies; no formal document or participant data changes. Session code endpoint
   unchanged.
+- ERGO-coverage amendment date: `2026-08-02` (Europe/London), before the first
+  formal participant session. Review window: `2026-07-30`.
+- Amendment relation: a new commit after
+  `0044d24ba8575e9e3216c177f50110d2a422d149`; the earlier commit is not amended
+  or rewritten. Only the field-note capture medium and quotation source change;
+  coding values, decision rules, aggregation and analysis remain unchanged.
+- Evidence: `docs/verification_records/ergo_coverage_field_notes.md`.
 
 The commit containing this file is the timestamped preregistration evidence.
 It supplements the operational S/audit chain without moving the frozen session
@@ -36,18 +43,26 @@ not as evidence that 2026-08-01 was the approval issue date.
 ## §2A Qualitative observation record
 
 The observation unit is participant × document. During each session the
-researcher captures only timestamps/audio markers, near-verbatim utterances,
-minimal context, technical incidents, and reflexivity notes. No qualitative
-classification or aggregation is performed between P1, P2, and P3. After all
-three sessions, split, merge, and navigation observations are coded using the
-rules below while preserving the raw note and audio reference.
+researcher captures only audio timestamps, 3–5 locating keywords, minimal
+operational context, technical incidents, and reflexivity notes. Approximate
+quotations are not written in the field record. No qualitative classification
+or aggregation is performed between P1, P2, and P3. After all three sessions,
+split, merge, and navigation observations are coded using the rules below;
+exact wording comes only from the approved recording transcript.
 
 Every utterance concerning grouping structure, relations between groups,
-moving/reading cards, or interface operation is timestamped and captured as
-near-verbatim as possible even when it is ambiguous. The researcher does not
-discard it because it does not appear to meet `observed` in the moment;
-clarity is adjudicated only during the delayed coding stage, where `unclear`
-remains a real possible outcome.
+moving/reading cards, or interface operation receives an audio timestamp and
+3–5 locating keywords even when it is ambiguous. The researcher does not
+discard it because it does not appear to meet `observed` in the moment. Clarity
+is adjudicated only during the delayed coding stage from the transcript, where
+`unclear` remains a real possible outcome.
+
+Formal-session field notes are observational locator notes only. They are not
+an independent analytic source and are not quoted in the thesis. They use only
+the identities `P1`, `P2`, and `P3`, contain no directly identifying
+information, and follow the DPA Plan storage and destruction controls. The
+qualitative summary is grounded in the recording transcript plus its audio
+timestamps.
 
 The fixed codes are `observed`, `no spontaneous expression recorded`, and
 `unclear`. Merge additionally takes `n/a (structurally unavailable)` when and
@@ -59,7 +74,7 @@ participant did not hold the view.
 `observed` requires a verbal expression of dissatisfaction with current
 grouping granularity, an intended structural change, or navigation/interface
 burden. A move or other silent behaviour is not qualitative evidence. An
-ambiguous remark is `unclear` and retains the wording and timestamp; the
+ambiguous remark is `unclear` and retains the transcript wording and audio timestamp; the
 researcher does not ask a clarifying follow-up. Split/merge observations are
 RQ2 granularity context, while navigation observations are workload/interface
 context; they are not a combined scale.
@@ -210,4 +225,5 @@ Consequently, the quantitative outputs are confirmation coverage/a lower bound
 on placement endorsement and an explicit-correction rate. They must not be
 reported as a complete acceptance rate, coding quality, thematic validity, or
 model accuracy. Think-aloud observations about split, merge, and navigation
-remain physically and analytically separate qualitative context.
+remain physically and analytically separate qualitative context grounded in
+the approved audio transcript; field notes are locator aids only.

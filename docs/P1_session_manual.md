@@ -265,8 +265,9 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 - 当前裁定以该 participant 对该 fragment 的最后动作为准。
 - 卡片在当前所属 cluster 内拿起并放回属于 no-op，不产生 move 记录。
 - 若文档只有一个 cluster，界面没有可表达“拆分成多个 cluster”的 move
-  目标。Researcher 不提示判断，但要特别留意并在 think-aloud/field note
-  中记录参与者自发表达的拆分意愿；这类口头观察不能伪装成 move 记录。
+  目标。Researcher 不提示判断，但要特别留意参与者自发表达的拆分意愿，现场
+  仅记录音时间点与定位关键词，准确原话取自录音转录；这类口头观察不能伪装成
+  move 记录。
 - 两个已知单簇正式文档为
   `P2_task1_batchB / 6a666d4f04fc296116b621af` 与
   `P3_task2_batchA / 6a666f0d5f60ce182f69ff12`。两者没有可用的 move
@@ -298,13 +299,16 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 - 采用自然观察方案：固定记录参与者自发说出的 split、merge 与 navigation
   意愿；researcher 不主动追问这些判断。
 - 只要发言涉及当前分组结构、簇间关系、卡片移动、阅读或界面操作，无论表达
-  是否明确，现场都必须记录时间点/录音标记与尽可能接近原话的内容；不得因
-  researcher 当场认为“还不算 observed”而省略。明确性只在三场结束后的回听
-  编码阶段判断，含糊内容可编码为 `unclear`。
+  是否明确，现场都必须记录录音时间点与三至五个定位关键词；不得因 researcher
+  当场认为“还不算 observed”而省略，也不得在现场写近似原话。明确性只在三场
+  结束后的回听编码阶段判断，含糊内容可编码为 `unclear`。
 - 观察笔记与 `clusterFeedback` 定量数据物理隔离，存放在独立的 session
   field-note 记录中，不写入 MongoDB，不伪装成 confirm、move 或 no-op。
-- 定量分析只使用 whitelist 文档的 `clusterFeedback`；观察笔记只作质性
-  上下文。二者在原始存储、导出文件和分析步骤中均保持分离。
+- 观察笔记只作为录音回听的定位工具，不是独立分析材料，不在论文中引用。
+  质性编码与汇总使用已批准录音的转录和录音时间点；定量分析只使用 whitelist
+  文档的 `clusterFeedback`。三者在原始存储、导出文件和分析步骤中均保持分离。
+- 正式 session 观察笔记只使用 `P1`/`P2`/`P3` 身份，不记录姓名、邮箱、签名或
+  其他可识别信息；其存储与销毁遵循 DPA Plan，与其他研究数据同等处理。
 - 本裁定不授权修改 session 工具。将来若要加入 split/merge 控件或结构化
   观察字段，必须建立新的 instrument 版本，不能作为 S 的补丁。
 
@@ -318,9 +322,10 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 
 - `observed`：参与者以言语表达对当前分组粒度的不满、明确的结构改动意愿，或
   明确的导航/界面负担。
-- `no spontaneous expression recorded`：录音与现场笔记中没有记录到符合标准的
-  自发表达；它**不表示**参与者没有这种感受。
-- `unclear`：评论含糊、语境不足、录音不清或无法可靠归类；必须保留原话和时间点。
+- `no spontaneous expression recorded`：录音转录中没有符合标准的自发表达；
+  它**不表示**参与者没有这种感受。
+- `unclear`：评论含糊、语境不足、录音不清或无法可靠归类；必须保留录音时间点
+  和转录中的原话。
 - `n/a (structurally unavailable)`：只允许用于 `cluster_count = 1` 文档的 merge
   字段，由预填表自动给出，不由 researcher 临场选择。Split 不设簇数阈值，
   split 与 navigation 均不得记 `n/a`。
@@ -337,14 +342,20 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 - 明确说出“簇太多、找不到目标、移动/阅读困难”等界面导航负担时，才记
   navigation `observed`；仅耗时较长不得据此推断。
 
+每条 `observed` 或 `unclear` 须附：participant、document/task、cluster count、
+录音时间点、转录中的原话、必要的最小语境。原话一律取自录音转录，不取自现场
+手记。现场手记只记录时间点与定位关键词，其作用是让回听阶段能够定位。
+
 采用两阶段编码：
 
-1. **现场捕获阶段**：所有涉及分组结构或界面操作的发言，无论是否明确，均记录
-   时间点、尽可能接近原话的短记录、最小语境、技术故障与 reflexivity；除表中
-   预印的结构性 merge `n/a` 外，不在现场编码、筛选或汇总。
-2. **延迟编码阶段**：三场全部结束后，才依据上述冻结规则为每个 document 填入
-   split、merge、navigation 编码。编码时同时保留录音时间点、原话和 cluster
-   count，不回写 MongoDB，不改变原始观察记录。
+1. **现场捕获阶段**：仅标“有相关发言”、录音时间点与三至五个定位关键词；
+   不记近似原话、不做三值判定。凡涉及分组结构或界面操作的发言，无论是否明确，
+   一律记时间点；宁可多记，不得在现场筛掉可能成为 `unclear` 的内容。技术故障与
+   reflexivity 可另栏记录，但不作为参与者原话或独立质性分析材料。
+2. **延迟编码阶段**：三场全部结束后一次性回听，才依据上述冻结规则为每个
+   document 填入 split、merge、navigation 三值（或结构性 `n/a`）；原话取自
+   转录，并同时保留录音时间点与 cluster count。不回写 MongoDB，不改变原始
+   录音或观察笔记。
 
 质性汇总只陈述具体观察，例如：
 
@@ -540,7 +551,7 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
   禁止把 `confirm / eligible` 简称为完整“接受率”。
 - 两个单簇文档 `6a666d4f04fc296116b621af` 与
   `6a666f0d5f60ce182f69ff12` 必须显式标注粒度背景：其 move 在结构上不可用，
-  split 意愿只存在于物理隔离的 think-aloud/field note 中。
+  split 意愿只从物理隔离的 think-aloud 录音转录中编码；观察笔记只用于定位。
 
 ### 5.2 Document、run 与粒度门禁
 
@@ -808,3 +819,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-07-30 | 在同一固定代码、20-input Batch C、零预加载模型与冻结参数下完成 Qwen post-reboot repeat；Llama/Qwen 各保留两次有效资源观测，并冻结“只报观察值、差异原因未分离”的解释边界。 |
 | 2026-08-01 | 在第一场正式 session 前记录 ERGO/FEC 门户 `Approved` 状态及无独立 PDF 批准函的证据边界；固定六点 briefing、统一结束问题、participant×document 两阶段质性观察编码、结构性 merge `n/a`、三张空白现场记录表和只读六项一致性检查工具。参与者仪器仍固定为 `ddb5355972ca63df44edad184b11e30f420e4c62`。 |
 | 2026-08-02 | 在第一场正式 session 前完成最后一次 docs-only 协议冻结：澄清 `N>0` 不单独停线及四类事件处置；固定外部 45 分钟计时、录音回放/存活检查、含糊发言全量现场捕获，以及 P1/P2/P3 三份等价双簇 demo 文档、`DEMO_Px` 身份和双重分析排除。参与者代码端点仍未改变。 |
+| 2026-08-02 | 在第一场正式 session 前依据 ERGO 115447 覆盖核实另立修订：观察笔记收紧为录音定位工具，只记录音时间点与 3–5 个关键词；准确原话和质性编码依据改为已批准录音的转录。三值、判定、汇总及分析口径不变；父提交 `0044d24ba8575e9e3216c177f50110d2a422d149` 未 amend。 |
