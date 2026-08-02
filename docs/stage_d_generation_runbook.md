@@ -502,6 +502,15 @@ ddb5355972ca63df44edad184b11e30f420e4c62
 纯视觉修改。三场之间任何代码、界面或行为变化都会破坏 participant 间仪器
 一致性；若必须修改，必须在第一场前重新彩排、冻结和审核。
 
+上述 2026-07-29 裁定作为历史记录保留。2026-08-02、第一场 participant action
+发生前，researcher 明确选择使用该 readability UI；因此停止旧端点开场，按本节
+预注册分支完成新鲜 `nie_pilot` 复制、简化交互验证、正式库零变化复核和重新
+冻结。两个 UI commits 与最新 session 协议链在
+`68c93006d408b6cf9d01c459d86757563f65b052` 汇合；当前正式 session checkout
+改为 `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`，完整证据见
+`docs/verification_records/session_card_readability_v1.md`。G2、九份正式文档、
+API/AI、Confirm/Move 记录行为及分析规则均未改变。
+
 正式 retention 与资源审计已确认：
 
 - A/B/C input 分别为 17/21/20，同 batch 三模型的 fragment multiset 与当前
@@ -524,13 +533,15 @@ docs/verification_records/retention_resource_order_audit.md
 
 当前关键路径：
 
-1. session 仪器二选一已经关闭，裁定为固定 `ddb53559...`；
-2. 正式招募、录音、参与者联系和数据收集仍等待 FEC 最终批准；
+1. session readability 分支已在第一场前完成 `nie_pilot` 验证和重新冻结；正式
+   endpoint 为 audit child 记录的 session UI operational full hash；
+2. ERGO/FEC 门户状态已目视核对为 `Approved`；无独立 PDF 批准函时只使用
+   portal status evidence，不虚构 PDF 凭据；
 3. Llama post-reboot repeat 已关闭；Azure portal cost 因当前账号无查看/
    导出权限而不可获得。该证据缺口不授权修改 session 仪器、估算成本或延伸
    成新的正式 generation；
-4. 若在第一场前重新提出任何 UI/code 变更，session 日期安排立即重新阻塞，
-   直到新仪器完成 PILOT、冻结和审核；以及
+4. 本次 UI 变更已经用新鲜 `nie_pilot` 关闭该阻塞；任何后续 UI/code 变更仍会
+   立即重新阻塞，直到另立仪器并重新完成 PILOT、冻结和审核；以及
 5. 第一场开始后直至 P3 结束，仪器不可变。
 
 后续任务除第 10 节七个文件外，还必须读取：

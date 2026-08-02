@@ -1,6 +1,6 @@
 # P1 formal-session field record
 
-> Session code endpoint: `ddb5355972ca63df44edad184b11e30f420e4c62`
+> Session code endpoint: `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`
 >
 > Stage 1 only during the session: record audio timestamps and 3–5 locating
 > keywords, plus operational context/incidents where needed. Do not write an

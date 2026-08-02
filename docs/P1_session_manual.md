@@ -21,25 +21,35 @@ ERGO 115447：导师已批准；researcher 于 2026-08-01 目视确认 ERGO/FEC 
 - 确认 `pipelineRuns.llm_backend`、`model_name`、`code_version` 与本次批准的实验配置一致。
 - 确认该 doc 位于正式 doc ID whitelist，不是开发或测试文档。
 
-#### Session 仪器冻结裁定（2026-07-29）
+#### Session 仪器冻结裁定（2026-08-02 第一场前修订）
 
-正式 P1/P2/P3 三场 session 统一使用精确 commit：
+2026-07-29 的“不修改 session UI”裁定及其精确端点
+`ddb5355972ca63df44edad184b11e30f420e4c62` 保留为历史 rollback anchor。
+第一场正式 session 尚未开始、P1 三份正式文档的 feedback 仍为零时，
+researcher 裁定既有卡片阅读方式可能降低限时审查的数据质量，因此按原裁定
+触发“停止开场 → 建立新 instrument → `nie_pilot` 验证 → 重新冻结”。
+
+新 session 仪器合并并保留以下两个原始 UI commits：
+
+- `c5b7354fb4df23e60382f4858922adac516f81f9`：固定卡片几何、零点击全文
+  inspection、pin/close、键盘行为和不改变卡片尺寸的 note popover；
+- `2f496942e78b2f43b909fbfe98b4c730e5c86644`：在 URL 中持久化 `docId`，
+  刷新、前进/后退和复制链接时保留 participant 与文档选择。
+
+两条历史在 merge commit
+`68c93006d408b6cf9d01c459d86757563f65b052` 汇合。正式 P1/P2/P3 三场统一
+checkout 到下述 session UI operational commit；该 commit 的 full hash 由
+其唯一 audit child 在不改变操作规则的情况下写回：
 
 ```text
-ddb5355972ca63df44edad184b11e30f420e4c62
+SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT
 ```
 
-裁定采用“不修改 session UI”的路径。候选分支
-`codex/session-card-readability-v1` 及其 commits `c5b7354`、`2f49694`
-不得用于正式 session。该候选不仅改变字号或对比度，还增加 full-text
-hover/pin、note popover、键盘交互和 URL 文档持久化，因此属于未重新彩排和
-冻结的参与者仪器变化。
-
-第一场 session 前必须 detached checkout 到上述完整 hash，并核对 clean
-worktree。P1、P2、P3 三场之间绝对不得切换 commit、分支或修改参与者界面。
-若任何可读性问题被裁定为足以影响数据质量，必须在第一场前停止招募日程，
-建立新 instrument、在 `nie_pilot` 重跑彩排、重新冻结并更新版本凭据；不得
-在 participant 之间热修。
+第一场前必须 detached checkout 到 audit child 记录的完整 operational hash，
+并核对 clean worktree。P1、P2、P3 三场之间绝对不得切换 commit、分支或修改
+参与者界面。上述 UI 改动只改变 presentation/inspection 与文档选择持久化；
+不改变 API、AI service、Confirm/Move 调用点、数据库字段、分析裁定、九份
+正式文档或 G2 生成仪器。
 
 #### 正式 doc ID whitelist 与盲测密钥（阶段 D 填写）
 
@@ -117,17 +127,22 @@ worktree。P1、P2、P3 三场之间绝对不得切换 commit、分支或修改�
 | `S` prompt hash 复核 | 2026-07-26；Ran 1 test；OK |
 | G→G2 upgrade record | `docs/verification_records/g2_instrument_upgrade.md` |
 | G2 generation record | `docs/verification_records/stage_d_g2_generation.md` |
-| Audit commit | `ddb5355972ca63df44edad184b11e30f420e4c62`；message `docs: audit record for S` |
-| Session checkout endpoint | `ddb5355972ca63df44edad184b11e30f420e4c62`（三场固定，不跟随分支移动） |
-| Session 前 `G2 → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
-| Session 前 `S → audit` 非 docs diff | 每次 session 前运行；必须无输出 |
+| Historical S audit / rollback anchor | `ddb5355972ca63df44edad184b11e30f420e4c62`；message `docs: audit record for S` |
+| Session UI merge commit | `68c93006d408b6cf9d01c459d86757563f65b052` |
+| Session UI validation record | `docs/verification_records/session_card_readability_v1.md` |
+| Session UI operational commit | `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT` |
+| Session checkout endpoint | `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`（三场固定，不跟随分支移动） |
+| Historical audit → UI endpoint API/AI diff | 必须无输出；UI 改动只允许位于 `react-client/src/views/ClusterGraphView.jsx` 与 `docs/` |
+| Session UI operational → audit HEAD 非 docs diff | 必须无输出 |
 | Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |
 
-当前操作版本层固定为 `G2`（annotated tag）→ `S`（whitelist/台账
-commit）→ 唯一 audit commit。历史 `G`、G-era runs 与升级过程保留在
-provenance 链中，但不得混入正式 whitelist。Audit commit 不自指记录自己的
-hash；其身份由正式操作分支的 `HEAD`、固定 commit message 及 parent=`S`
-共同核对。
+版本层分为两条互不混淆的链：生成链仍为 `G2`（annotated tag）→ `S`
+（whitelist/台账 commit）→ 历史 S audit；参与者界面链为历史 S audit → 两个
+UI commits → merge commit → session UI operational commit → 唯一 docs-only
+audit child。正式九文档的 `pipelineRuns.code_version` 仍只允许等于 G2；session
+checkout 则固定到 UI operational commit。历史 `G`、G-era runs 与旧 session
+rollback anchor 均保留在 provenance 链中，不得混入正式 whitelist 或冒充当前
+参与者仪器。
 
 若建立 G2 后发现代码缺陷，不得在 `G2 → S` 间直接修补。必须二选一并留档：保持 G2 完成实验并把缺陷写入 limitation；或修复后废止当前正式候选文档、建立新 generation tag 并重新生成全部九个文档。不得混用两个仪器版本。
 

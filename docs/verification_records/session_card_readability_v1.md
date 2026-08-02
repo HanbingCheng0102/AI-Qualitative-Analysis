@@ -1,6 +1,6 @@
 # Session card readability instrument v1
 
-Status: candidate; not approved for a formal participant session
+Status: release gate passed; approved before the first formal participant session
 
 Date: 2026-07-27
 
@@ -107,3 +107,114 @@ This candidate must not be used in a formal participant session until:
 If the fresh PILOT exposes another error, stop using this candidate and return
 to the audit/rollback anchor above. Do not repair it during a participant
 session.
+
+## Release-gate closure (2026-08-02)
+
+The researcher explicitly selected this UI before the first formal participant
+action. The old `ddb5355972ca63df44edad184b11e30f420e4c62` session endpoint was
+started for preflight, then stopped when the version mismatch was noticed. No
+demo or formal feedback was written: `DEMO_P1` had zero feedback on its demo
+document and `P1` had zero feedback on all three formal P1 documents.
+
+The latest protocol line and the two preserved UI commits were joined without
+rewriting either history:
+
+- protocol parent: `8ed3aa17551611388a3b5d5074eb4d9c032ab2b0`;
+- UI parent: `2f496942e78b2f43b909fbfe98b4c730e5c86644`;
+- integration merge: `68c93006d408b6cf9d01c459d86757563f65b052`.
+
+The participant runtime is the session UI operational commit containing this
+release closure. Its full hash is recorded by the unique following audit child:
+
+```text
+SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT
+```
+
+### Static and test gates
+
+- `git diff --check`: passed.
+- React production build: Vite `5.4.21`, 2,480 modules transformed; passed with
+  the unchanged large-chunk warning.
+- Target-file lint: 0 errors and the same 5 hook warnings already recorded for
+  the candidate.
+- Full AI suite: 83 tests passed; 3 live probes skipped as designed.
+- G2 prompt hash: 1 test passed.
+- `api-server` and `ai-service` are byte-diff unchanged from the historical S
+  audit endpoint.
+
+### Fresh isolated database copy
+
+Evidence root (outside the repository):
+`D:\6003\session_ui_validation\20260802_233721`.
+
+- Database Tools `100.17.0` and the previously verified isolation scripts were
+  reused by exact path; no restricted text or key was printed.
+- The copy held formal `nie` at `lockCount 0 -> 1 -> 0`, produced SOURCE_PRE and
+  SOURCE_POST dumps, and restored 1,661 documents with zero restore failures to
+  a fresh `127.0.0.1:27018/nie_pilot`.
+- The outer caller initially reported failure because it inspected the
+  expected non-zero `$LASTEXITCODE` left by the unlocked-state probe after the
+  copy script itself completed. The copy was not retried. Independent semantic
+  and BSON checks all passed.
+- Copy comparison SHA-256:
+  `4D1D3970C7FB880483DA47078513373C7B04A4081919A6B42C1F29EAF710314B`.
+- SOURCE_PRE manifest SHA-256:
+  `10198213859E63FBBAB7C12B01FCF6791E52BE589E222D323050EB1806EBE242`.
+- SOURCE_POST manifest SHA-256:
+  `CBEB21CFB8239BC7018E2DC2EA265D8A0BFE7492FE8D1D8CD27EFE20980D3150`.
+- Pilot baseline manifest SHA-256:
+  `DBDE0AD542DB7C6CC49672BA6F1FA319470CCCF7F4EC6425A5E1DE146F05CCF3`.
+
+### Runtime and interaction gate
+
+The runtime was locked to integration commit `68c93006...`, formal port 27017
+and Ollama port 11434 were closed, and API/AI connections were observed as
+`nie-ui-pilot-api` and `nie-ui-pilot-ai` on `nie_pilot`.
+
+Two watchdog starts failed closed because the first two Vite launches bound
+only to IPv6 `[::1]:5173`, while the approved watchdog intentionally inspects
+IPv4 TCP listeners. Each failure stopped only its recorded React/API/AI PIDs.
+The third launch bound Vite explicitly to `127.0.0.1`; watchdog attempt 3 then
+remained active for the complete interaction gate. No participant action was
+written during the failed starts.
+
+Using participant `DEMO_P1` and the excluded two-cluster demo document
+`6a6f8bd596018eb206d7ead2`, the researcher verified:
+
+- fixed `240 x 132` cards;
+- zero-click hover full text;
+- pin, scroll and close;
+- keyboard focus plus Enter/Space control;
+- note popover without card resize;
+- one confirm and one cross-cluster move;
+- participant and `docId` persistence after refresh and in a copied URL.
+
+The browser provenance error value was raw `null`. MongoDB contained exactly
+one `confirm`, one `move`, and one saved verification note. The move had distinct
+and non-null `from_cluster_id`/`to_cluster_id`; its current fragment projection
+and cluster membership agreed. Only `clusterFeedback`, `clusters`, and
+`fragments` changed, exactly as expected. Pilot-post manifest SHA-256:
+`AACF64406ECD093B454222B882361736F952632692515B35BA783D9AA63ABA5C`.
+The redacted validation summary SHA-256 is
+`F3EF50D201A5DABF487AAA81215325E94859CC02098767D4F8E3B8070CC6FA9F`.
+
+The versioned `formal_session_integrity.py` correctly rejected `DEMO_P1`
+because its preregistered pilot mode accepts only the historical `PILOT`
+participant. The tool was not changed and the participant was not relabelled;
+the equivalent scoped checks above were executed read-only and this limitation
+is explicit.
+
+### Formal-source postcondition
+
+After the isolated stack was stopped and the pilot database was dumped, formal
+MongoDB was restarted from its original dbpath. The full semantic audit before
+and after validation was byte-identical, with SHA-256
+`5DBA16EB3E813E7B3E5FFFFB93D28EE31147B6EB2E10E77513D937A901BB52A8`.
+The nine-document combined snapshot remained
+`228204a88ccce72c1e017a0d926f675f10e5f5b9ea36c96d322fb6fed2c8b1b0`.
+Formal P1 feedback and DEMO_P1 feedback on all three P1 whitelist documents
+both remained zero.
+
+The release gate is therefore closed. Any participant-facing change after this
+operational freeze requires a new instrument decision and a new isolated
+validation; P1, P2 and P3 must use one unchanged operational commit.

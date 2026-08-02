@@ -7,9 +7,10 @@ gate. Do not rely on memory or a moving branch name.
 
 - [ ] ERGO/FEC portal status displays `Approved`; observation time/initials: __________
 - [ ] PIS/consent/recording procedure matches the approved materials.
-- [ ] Repository detached at `ddb5355972ca63df44edad184b11e30f420e4c62`.
+- [ ] Repository detached at `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`.
 - [ ] `git status --short` has no output.
-- [ ] G2→audit and S→audit non-doc diffs have no output; prompt hash test passes.
+- [ ] `ddb53559…`→session endpoint has no `api-server`/`ai-service` diff;
+      operational→audit has no non-doc diff; G2 prompt hash test passes.
 - [ ] Azure/cloud keys removed from the session environment.
 - [ ] Ollama stopped; port 11434 has no listener.
 - [ ] `OLLAMA_MODEL=llama3.2:3b` is present only as a no-fallback guard; no model
