@@ -7,7 +7,7 @@ gate. Do not rely on memory or a moving branch name.
 
 - [ ] ERGO/FEC portal status displays `Approved`; observation time/initials: __________
 - [ ] PIS/consent/recording procedure matches the approved materials.
-- [ ] Repository detached at `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`.
+- [ ] Repository detached at `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`.
 - [ ] `git status --short` has no output.
 - [ ] `ddb53559…`→session endpoint has no `api-server`/`ai-service` diff;
       operational→audit has no non-doc diff; G2 prompt hash test passes.

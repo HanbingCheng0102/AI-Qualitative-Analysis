@@ -507,7 +507,7 @@ ddb5355972ca63df44edad184b11e30f420e4c62
 预注册分支完成新鲜 `nie_pilot` 复制、简化交互验证、正式库零变化复核和重新
 冻结。两个 UI commits 与最新 session 协议链在
 `68c93006d408b6cf9d01c459d86757563f65b052` 汇合；当前正式 session checkout
-改为 `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`，完整证据见
+改为 `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`，完整证据见
 `docs/verification_records/session_card_readability_v1.md`。G2、九份正式文档、
 API/AI、Confirm/Move 记录行为及分析规则均未改变。
 

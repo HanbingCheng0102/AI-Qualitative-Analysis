@@ -42,7 +42,7 @@ checkout 到下述 session UI operational commit；该 commit 的 full hash 由
 其唯一 audit child 在不改变操作规则的情况下写回：
 
 ```text
-SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT
+0e37f187d95db5f10cb6892cc2a97b543a5bd4eb
 ```
 
 第一场前必须 detached checkout 到 audit child 记录的完整 operational hash，
@@ -130,8 +130,8 @@ SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT
 | Historical S audit / rollback anchor | `ddb5355972ca63df44edad184b11e30f420e4c62`；message `docs: audit record for S` |
 | Session UI merge commit | `68c93006d408b6cf9d01c459d86757563f65b052` |
 | Session UI validation record | `docs/verification_records/session_card_readability_v1.md` |
-| Session UI operational commit | `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT` |
-| Session checkout endpoint | `SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT`（三场固定，不跟随分支移动） |
+| Session UI operational commit | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb` |
+| Session checkout endpoint | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`（三场固定，不跟随分支移动） |
 | Historical audit → UI endpoint API/AI diff | 必须无输出；UI 改动只允许位于 `react-client/src/views/ClusterGraphView.jsx` 与 `docs/` |
 | Session UI operational → audit HEAD 非 docs diff | 必须无输出 |
 | Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |

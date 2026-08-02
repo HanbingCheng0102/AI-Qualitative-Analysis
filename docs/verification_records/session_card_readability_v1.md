@@ -127,7 +127,7 @@ The participant runtime is the session UI operational commit containing this
 release closure. Its full hash is recorded by the unique following audit child:
 
 ```text
-SESSION_UI_V1_OPERATIONAL_FULL_HASH_PENDING_AUDIT
+0e37f187d95db5f10cb6892cc2a97b543a5bd4eb
 ```
 
 ### Static and test gates
@@ -218,3 +218,39 @@ both remained zero.
 The release gate is therefore closed. Any participant-facing change after this
 operational freeze requires a new instrument decision and a new isolated
 validation; P1, P2 and P3 must use one unchanged operational commit.
+
+## Operational-commit audit
+
+The operational session instrument is exactly:
+
+```text
+0e37f187d95db5f10cb6892cc2a97b543a5bd4eb
+```
+
+Its direct parent is integration merge
+`68c93006d408b6cf9d01c459d86757563f65b052`; its commit message is
+`docs: freeze formal session UI v1 protocol`. The operational commit contains
+the complete participant-facing code and protocol. This audit child changes
+only `docs/` credentials and does not change the runtime.
+
+The pre-audit commands produced:
+
+```text
+git diff --check
+<no output; exit 0>
+
+git diff --exit-code 68c93006d408b6cf9d01c459d86757563f65b052 -- . ':(exclude)docs'
+<no output; exit 0>
+
+git diff --exit-code ddb5355972ca63df44edad184b11e30f420e4c62..68c93006d408b6cf9d01c459d86757563f65b052 -- api-server ai-service
+<no output; exit 0>
+
+python -m unittest tests.test_llm_provider.PromptFreezeTests.test_current_prompts_match_g2_byte_hashes -v
+Ran 1 test in 0.002s
+OK
+```
+
+The audit commit is identified by its fixed message
+`docs: audit formal session UI v1`, direct parent equal to the operational hash
+above, and the pushed branch state. It is not the participant runtime endpoint;
+formal P1/P2/P3 sessions detach to the operational hash above.
