@@ -147,6 +147,10 @@ LLM_SEED=42
 LLM_MAX_TOKENS=1024
 ```
 
+`OLLAMA_MODEL=llama3.2:3b` 只用于防止配置缺省或漂移；正式 session **不调用
+模型**。Session 期间 Ollama 必须停止且 `11434` 无监听。这个说明同时写入本地
+`.env` 的注释，但 `.env` 本身不得提交、打印或进入证据包。
+
 Session 前必须从本地 `.env` 移除 Azure key，并停止 Ollama，形成云端凭据与
 本地模型服务的双重物理隔离。完成隔离后不得再触发生成、LLM clustering、
 LLM labelling 或 suggestion 路径；`FREEZE_LABELS=true` 的正式 session
@@ -201,6 +205,8 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
   也不因前一份文档的粒度、完成度或参与者反应而调换。
 - Researcher 记录审查段总开始/结束时间，并为每份文档分别记录
   `doc_id`、开始时间与结束时间；时间使用带时区的 ISO 8601。
+- 使用外部可见的 `45:00` 倒计时器执行停止规则；计时器静音、只对 researcher
+  可见，参与者不可见，以免诱发赶工。不得用墙钟估算或事后推算 45 分钟。
 - 达到 45 分钟时立即停止，不要求完成当前卡片或当前文档，不补时、不加速
   提示，也不在 session 后补做。尚无有效 feedback 的 eligible fragments
   仍按第 5.1 节记为 `no recorded decision (reject-or-unreviewed)`。
@@ -212,7 +218,8 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 
 1. **接待与知情同意（不计入 45 分钟）**：全部内容按获批 ERGO/PIS/consent
    文件执行。录音只能在 consent 完成后开始；拒绝录音时能否继续参加按获批文件
-   执行，不临场决定。
+   执行，不临场决定。Consent 后先录制约 10 秒测试音频，停止并回放确认可听，
+   再开始正式录音；每次正式文档切换时仅目视确认录音仍在运行，不中断任务。
 2. **统一 briefing（不计入 45 分钟）**：三场逐字使用以下六点：
    - AI 已把访谈内容初步分成若干组；请逐条查看，判断 fragment 当前所在组是否合适。
    - 这是对 **first-pass clustering placement** 的检查，不是要求完成完整的定性
@@ -225,9 +232,21 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
      或判断理由追加追问。
    - 逐字界面提示：**“本研究关闭了界面的部分功能。你可能会看到一个提到
      AI suggestions 的进度提示，请忽略它，它不会启用。”**
-3. **熟悉界面（不计入 45 分钟）**：仅使用非正式/演示文档各演示一次 confirm
-   与拖动；不得打开九份正式 whitelist 文档。演示后重新核对 URL participant
-   参数、badge 和第一份正式 doc ID。
+3. **熟悉界面（不计入 45 分钟）**：仅使用下表中该 participant 专属的 demo
+   文档各演示一次 confirm 与拖动；三份 demo 均为 20 fragments、2 clusters、
+   零初始 feedback 的等价副本，不得交叉使用、复用 smoke 文档或打开九份正式
+   whitelist 文档。
+
+   | Formal session | Demo participant 参数与 badge | Demo doc ID | 初始簇数 |
+   | --- | --- | --- | ---: |
+   | P1 | `DEMO_P1` / `Participant: DEMO_P1` | `6a6f8bd596018eb206d7ead2` | 2 |
+   | P2 | `DEMO_P2` / `Participant: DEMO_P2` | `6a6f8bd696018eb206d7eae7` | 2 |
+   | P3 | `DEMO_P3` / `Participant: DEMO_P3` | `6a6f8bd696018eb206d7eafc` | 2 |
+
+   Demo 完成后必须把 URL participant 改回正式 `P1`/`P2`/`P3`，重新核对 badge，
+   再用精确 doc ID 加载第一份正式文档。Demo feedback 只属于对应 `DEMO_Px`
+   身份和 demo doc，永不进入正式分析。三份 ingest、等价性和正式九文档零变化
+   证据见 `docs/verification_records/formal_session_demo_freeze.md`。
 4. **计时任务（45 分钟）**：第一份正式文档加载完成且 researcher 宣布开始时
    计时。逐文档记录起止时间；参与者自行决定何时进入下一份。45 分钟到立即停止。
 5. **统一结束问题（不计入 45 分钟）**：三场均逐字只问一次：
@@ -278,6 +297,10 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 
 - 采用自然观察方案：固定记录参与者自发说出的 split、merge 与 navigation
   意愿；researcher 不主动追问这些判断。
+- 只要发言涉及当前分组结构、簇间关系、卡片移动、阅读或界面操作，无论表达
+  是否明确，现场都必须记录时间点/录音标记与尽可能接近原话的内容；不得因
+  researcher 当场认为“还不算 observed”而省略。明确性只在三场结束后的回听
+  编码阶段判断，含糊内容可编码为 `unclear`。
 - 观察笔记与 `clusterFeedback` 定量数据物理隔离，存放在独立的 session
   field-note 记录中，不写入 MongoDB，不伪装成 confirm、move 或 no-op。
 - 定量分析只使用 whitelist 文档的 `clusterFeedback`；观察笔记只作质性
@@ -316,8 +339,9 @@ JSON.parse(localStorage.getItem("nieFeedbackProvenanceErrors"))
 
 采用两阶段编码：
 
-1. **现场捕获阶段**：只记录时间点、尽可能接近原话的短记录、最小语境、技术
-   故障与 reflexivity；除表中预印的结构性 merge `n/a` 外，不在现场编码或汇总。
+1. **现场捕获阶段**：所有涉及分组结构或界面操作的发言，无论是否明确，均记录
+   时间点、尽可能接近原话的短记录、最小语境、技术故障与 reflexivity；除表中
+   预印的结构性 merge `n/a` 外，不在现场编码、筛选或汇总。
 2. **延迟编码阶段**：三场全部结束后，才依据上述冻结规则为每个 document 填入
    split、merge、navigation 编码。编码时同时保留录音时间点、原话和 cluster
    count，不回写 MongoDB，不改变原始观察记录。
@@ -417,6 +441,8 @@ P1_task2_batchB
 
 - 正式身份：`P1`、`P2`、`P3`。
 - 彩排身份：`PILOT`；只用于端到端彩排，不进入正式模型比较。
+- 固定界面演示身份：`DEMO_P1`、`DEMO_P2`、`DEMO_P3`；各自只允许操作第 1.8 节
+  指定的专属 demo doc，不得用于正式 whitelist 文档。
 - Participant ID 按 `trim + uppercase` 规范化，并进行精确匹配。
 - 缺失或空身份进入 `TEST` 隔离桶。
 
@@ -429,6 +455,9 @@ TEST
 P_TEST
 P_OTHER
 PILOT
+DEMO_P1
+DEMO_P2
+DEMO_P3
 RACE_TEST
 RACE_TEST_1
 RACE_TEST_2
@@ -443,14 +472,15 @@ S 建立时已逐项核对上述名单；没有从 private generation ledger 发
 participant 身份。正式分析仍须先运行 `distinct("participant_id")`，不能把
 本快照当作未来数据的自动许可。
 
-### 4.4 开发与 smoke 文档排除名单
+### 4.4 开发、smoke 与 demo 文档排除名单
 
-以下文档真实存在于 `documents` 与 `pipelineRuns`，但绝不进入正式 doc ID
-whitelist，也绝不进入分析。生成冻结期先把每个 smoke/attempt 写入 ignored
+以下条目真实存在于 `documents`；生成/smoke 条目还具有 `pipelineRuns`，而专用
+demo 文档按设计没有 generation run。它们绝不进入正式 doc ID whitelist，也
+绝不进入分析。生成冻结期先把每个 smoke/attempt 写入 ignored
 private ledger；九个正式文档完成后在 S 中一次性回填本表，避免生成期间
 产生 tracked docs 变更。正式分析开始前本表必须完成对账。
 
-| Survey name | 用途 | doc_id（阶段 D 登记） |
+| Survey name | 用途 | doc_id（登记） |
 | --- | --- | --- |
 | `D_SMOKE_LLAMA_batchA` | Llama smoke attempt 1；编排失败，provider 未调用 | `6a64c2e83e0dbddf5447c741` |
 | `D_SMOKE_LLAMA_batchA_attempt2` | G-era Llama 20 行 smoke；completed；G2 后排除 | `6a64c6bb3e0dbddf5447c757` |
@@ -463,6 +493,10 @@ private ledger；九个正式文档完成后在 S 中一次性回填本表，避
 | `D_SMOKE_G2_QWEN_batchA` | G2 Qwen 20 行配置/provider/schema smoke；completed | `6a661d1ec2a3cea7e6de6028` |
 | `D_SMOKE_G2_AZURE_batchA` | G2 Azure deployment/schema 20 行 smoke；completed | `6a661f814b63e7a3c45dd144` |
 | `P1_task2_batchB` | 2026-07-16 历史开发文档；与未来 Azure 正式文档同名 | `6a58d2cd1d6d1e80c35ba564` |
+| `R5_OLLAMA_SAMPLING_batchA` | 历史 sampling 诊断文档；只作为 demo 初始投影来源，不向正式 participant 打开 | `6a5cfca621fc0a91ba66e692` |
+| `D_SESSION_DEMO_P1` | P1 专属界面演示副本；20 fragments、2 clusters；永不分析 | `6a6f8bd596018eb206d7ead2` |
+| `D_SESSION_DEMO_P2` | P2 专属界面演示副本；20 fragments、2 clusters；永不分析 | `6a6f8bd696018eb206d7eae7` |
+| `D_SESSION_DEMO_P3` | P3 专属界面演示副本；20 fragments、2 clusters；永不分析 | `6a6f8bd696018eb206d7eafc` |
 
 所有分析脚本必须同时实施两道 document 门禁：
 
@@ -537,6 +571,18 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
   它保留为 `no recorded decision`。报告 `N`、失败类型、受影响文档/fragment
   数及处置。若下列一致性检查任一失败，暂停该 participant-document 的定量
   分析并单独裁定；不得事后修库来制造通过。
+
+现场推进只按以下四类事件裁定；`N` 与工具/执行故障不得混为一类：
+
+| 事件 | 第一场前冻结的处理 |
+| --- | --- |
+| `integrity_N > 0`，但脚本正常、数据库/participant/doc 身份正确 | 保存原始日志并逐条对账；按上述预注册规则报告和调整指标，**不因 N 非零单独停掉后续 participant**。 |
+| 完整性脚本自身异常、未生成可信输出或退出码非零 | 停线，不开始下一名 participant；保留输出并核查工具或适用检查的 FAIL。 |
+| 数据库、正式 participant、whitelist doc/run 身份不匹配 | 立即停线；隔离受影响 participant-document，等待单独裁定，不删除或自动宣布整场有效/无效。 |
+| 本应适用的检查返回 `NA` | 停线核查作用域；但某文档没有任何 move 时，检查 5/6 返回 `NA` 是预注册的正常结果，不触发停线。 |
+
+`overall_status` 只汇总六项检查的 PASS/FAIL，不含 `integrity_N`；因此不得把
+“`overall_status=PASS` 且 `N=0`”写成继续下一场的联合门槛。
 
 #### 5.2.2 六项一致性检查
 
@@ -761,3 +807,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-07-30 | 在任何正式 session 开始前预注册：浏览器失败日志与 `N` integrity figure 的非零处置、六项一致性检查及第 5/6 项的 move-only 作用域、first-pass clustering assistance 构念边界、固定顺序与 45 分钟停止/逐文档计时规则。 |
 | 2026-07-30 | 在同一固定代码、20-input Batch C、零预加载模型与冻结参数下完成 Qwen post-reboot repeat；Llama/Qwen 各保留两次有效资源观测，并冻结“只报观察值、差异原因未分离”的解释边界。 |
 | 2026-08-01 | 在第一场正式 session 前记录 ERGO/FEC 门户 `Approved` 状态及无独立 PDF 批准函的证据边界；固定六点 briefing、统一结束问题、participant×document 两阶段质性观察编码、结构性 merge `n/a`、三张空白现场记录表和只读六项一致性检查工具。参与者仪器仍固定为 `ddb5355972ca63df44edad184b11e30f420e4c62`。 |
+| 2026-08-02 | 在第一场正式 session 前完成最后一次 docs-only 协议冻结：澄清 `N>0` 不单独停线及四类事件处置；固定外部 45 分钟计时、录音回放/存活检查、含糊发言全量现场捕获，以及 P1/P2/P3 三份等价双簇 demo 文档、`DEMO_Px` 身份和双重分析排除。参与者代码端点仍未改变。 |

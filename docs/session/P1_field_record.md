@@ -12,22 +12,38 @@
 - Date: ____________________
 - Portal `Approved` status rechecked at: ____________________
 - PIS/consent procedure completed: Yes / No
-- Recording consent and recording started after consent: Yes / No / ERGO-approved exception
+- Consent completed before any recording: Yes / No
+- 10-second test recording played back and intelligible: Yes / No
+- Main recording started after the playback check: Yes / No / ERGO-approved exception
+- Silent `45:00` timer prepared, researcher-only view: Yes / No
 - URL badge visually verified as `Participant: P1`: Yes / No
 - Overall review start (ISO 8601 with timezone): ____________________
 - Overall review end: ____________________
 - Stop reason: all three documents completed / 45-minute limit
 - Browser failure-log raw count `N` (post-session export): ____________________
 
+## Familiarization gate — not part of the 45 minutes
+
+- Demo participant parameter: `DEMO_P1`
+- Demo badge checked as `Participant: DEMO_P1`: Yes / No
+- Demo doc ID: `6a6f8bd596018eb206d7ead2`
+- Initial cluster count face-checked as `2`: Yes / No
+- One confirm and one cross-cluster move demonstrated: Yes / No
+- After demo, URL/badge changed back to `P1`: Yes / No
+- First formal doc loaded only after the `P1` badge recheck: Yes / No
+
 ## Assigned documents and ID face-check
 
-| Order | Document | Batch | doc_id | Clusters | Start | End | ID checked by/time |
-| --- | --- | --- | --- | ---: | --- | --- | --- |
-| 1 | `P1_task1_batchA` | A | `6a6621355e9bd7a009d1b97f` | 7 | | | |
-| 2 | `P1_task2_batchB` | B | `6a6672adaaaa46976afdb5ba` | 11 | | | |
-| 3 | `P1_task3_batchC` | C | `6a662813ed5bcd0c9d8a4439` | 2 | | | |
+| Order | Document | Batch | doc_id | Clusters | Start | End | Recording running | ID checked by/time |
+| --- | --- | --- | --- | ---: | --- | --- | --- | --- |
+| 1 | `P1_task1_batchA` | A | `6a6621355e9bd7a009d1b97f` | 7 | | | | |
+| 2 | `P1_task2_batchB` | B | `6a6672adaaaa46976afdb5ba` | 11 | | | | |
+| 3 | `P1_task3_batchC` | C | `6a662813ed5bcd0c9d8a4439` | 2 | | | | |
 
 ## Stage 1 event notes
+
+Record every utterance about grouping structure or interface operation,
+including ambiguous remarks; do not decide `observed` versus `unclear` here.
 
 | Timestamp/audio marker | Task | Near-verbatim utterance or visible incident | Minimal context | Technical consequence | Reflexivity note |
 | --- | --- | --- | --- | --- | --- |
@@ -52,4 +68,3 @@ merge additionally uses preprinted `n/a` only when clusters = 1.
 - Asked exactly once: “整体感受如何？” Yes / No
 - Response timestamp/audio marker: ____________________
 - No follow-up or document comparison question asked: Yes / No
-

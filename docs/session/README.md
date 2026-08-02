@@ -13,4 +13,12 @@ This directory contains blank, version-controlled operational templates only.
   only during the post-session analysis stage.
 - The two prefilled merge `n/a` cells are structural rules, not observations:
   P2 task1 and P3 task2 each contain one cluster.
-
+- Each paper record contains the exact dedicated demo document and `DEMO_Px`
+  participant identity for that session. Do not substitute a smoke, formal or
+  another participant's demo document.
+- Use a silent researcher-only 45-minute countdown. After consent, verify an
+  approximately 10-second test recording by playback before starting the main
+  recording, and visually check recording status at every document transition.
+- Timestamp every utterance concerning grouping structure or interface
+  operation, including ambiguous remarks. `observed`/`unclear` coding happens
+  only after all three sessions.

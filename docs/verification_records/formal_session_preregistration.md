@@ -8,12 +8,19 @@
   `ddb5355972ca63df44edad184b11e30f420e4c62`
 - Parent documentation commit:
   `7d4e403c60183f75bafc1b5951aa9886f481c8de`
-- Scope: procedural and analytic rules only; no session code, database, prompt,
-  schema, formal input, matrix, or participant data change
+- Initial 2026-07-30 scope: procedural and analytic rules only; no session code,
+  database, prompt, schema, formal input, matrix, or participant data change
 - Qualitative-record amendment date: `2026-08-01` (Europe/London), before the
   first formal participant session
 - Amendment scope: briefing wording, delayed qualitative coding, blank field
   records, and the uniform closing question; session code endpoint unchanged
+- Final procedural-freeze date: `2026-08-02` (Europe/London), before the first
+  formal participant session
+- Final-freeze scope: `N>0` continuation semantics, full capture of ambiguous
+  utterances, external timing, recording verification, and three fixed demo
+  copies/identities. Database writes are limited to those three excluded demo
+  copies; no formal document or participant data changes. Session code endpoint
+  unchanged.
 
 The commit containing this file is the timestamped preregistration evidence.
 It supplements the operational S/audit chain without moving the frozen session
@@ -34,6 +41,13 @@ minimal context, technical incidents, and reflexivity notes. No qualitative
 classification or aggregation is performed between P1, P2, and P3. After all
 three sessions, split, merge, and navigation observations are coded using the
 rules below while preserving the raw note and audio reference.
+
+Every utterance concerning grouping structure, relations between groups,
+moving/reading cards, or interface operation is timestamped and captured as
+near-verbatim as possible even when it is ambiguous. The researcher does not
+discard it because it does not appear to meet `observed` in the moment;
+clarity is adjudicated only during the delayed coding stage, where `unclear`
+remains a real possible outcome.
 
 The fixed codes are `observed`, `no spontaneous expression recorded`, and
 `unclear`. Merge additionally takes `n/a (structurally unavailable)` when and
@@ -66,6 +80,10 @@ the first assigned document is loaded and the researcher releases the
 participant to start. Consent, recording setup, and post-session checks are
 outside this review timer.
 
+The limit is enforced with a silent external `45:00` countdown visible to the
+researcher but not the participant. It is not estimated from a wall clock or
+reconstructed after the session.
+
 Document order is the participant-specific task1 → task2 → task3 order already
 fixed in the Latin-square matrix. It is not randomized again within a session
 and is not changed in response to granularity, completion, or participant
@@ -76,6 +94,28 @@ At 45 minutes the researcher stops immediately, even if the current fragment or
 document is unfinished. There is no extension, speed-up instruction, or
 post-session completion. Eligible fragments without a valid action remain
 `no recorded decision (reject-or-unreviewed)`.
+
+## §4A Recording and fixed familiarization documents
+
+After consent, the researcher records an approximately 10-second test, stops
+and plays it back to establish that audio is intelligible, then starts the main
+recording. At every formal-document transition the researcher visually checks
+that recording is still running without interrupting the participant.
+
+Familiarization uses one dedicated two-cluster document per formal participant.
+The URL participant and badge must be the paired `DEMO_Px` value during the
+demonstration and must be changed back to the formal participant before the
+first formal document is opened:
+
+| Formal participant | Demo participant | Demo doc ID | Initial fragments/clusters |
+| --- | --- | --- | ---: |
+| P1 | `DEMO_P1` | `6a6f8bd596018eb206d7ead2` | 20 / 2 |
+| P2 | `DEMO_P2` | `6a6f8bd696018eb206d7eae7` | 20 / 2 |
+| P3 | `DEMO_P3` | `6a6f8bd696018eb206d7eafc` | 20 / 2 |
+
+The copies have the same verified initial semantic hash, contain no initial
+feedback, and are neither formal whitelist documents nor smoke documents.
+Demo identities and documents are permanently excluded from formal analysis.
 
 ## §5.2 Failure handling and consistency checks
 
@@ -104,6 +144,20 @@ database state.
   adjudication. Failure of any applicable consistency check below quarantines
   that participant-document from quantitative analysis pending a separate
   decision. The database is not repaired to manufacture a PASS.
+
+`N>0` is an integrity result, not by itself a stopping rule and not a reason to
+omit later participants. The operational decision table is fixed as follows:
+
+| Event | Action before the next participant |
+| --- | --- |
+| `N>0`, with a functioning checker and correct database/participant/document identity | Preserve and reconcile the entries, report `N`, and continue; apply the preregistered numerator/denominator rules. |
+| Checker malfunction, no trustworthy output, or non-zero checker exit | Stop and investigate before starting the next participant. |
+| Database, participant, whitelist document, or approved run mismatch | Stop; quarantine the affected participant-document for a separate decision without deletion or automatic repair. |
+| An applicable check is unexpectedly `NA` | Stop and inspect check scope. Checks 5/6 being `NA` when the document has no move is expected and does not stop the study. |
+
+The checker `overall_status` summarizes consistency-check PASS/FAIL values and
+does not include `N`. Continuation is therefore never conditioned on the joint
+requirement `overall_status=PASS AND N=0`.
 
 ### Six preregistered consistency checks
 
