@@ -68,6 +68,6 @@ gate. Do not rely on memory or a moving branch name.
       stop pending investigation.
 - [ ] Database/participant/doc/run mismatch caused a stop and quarantine of the
       affected participant-document; nothing was deleted or repaired.
-- [ ] Unexpected `NA` caused a scope check. Checks 5/6 were allowed to be `NA`
-      only where the document had no move.
+- [ ] Unexpected `NA` caused a scope check. Only Check 5 was allowed to be `NA`
+      where the document had no move; all-eligible Check 6 returned PASS or FAIL.
 - [ ] `overall_status` was not combined with `N=0` as a joint continuation gate.

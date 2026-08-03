@@ -1,7 +1,10 @@
 import importlib.util
 import sys
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+
+from bson import ObjectId
 
 
 MODULE_PATH = Path(__file__).with_name("formal_session_integrity.py")
@@ -55,6 +58,152 @@ class AssignmentTests(unittest.TestCase):
         self.assertEqual(
             ["P2_task1_batchB", "P2_task2_batchC", "P2_task3_batchA"],
             [document.name for document in documents],
+        )
+
+
+class PostMoveProjectionTests(unittest.TestCase):
+    def setUp(self):
+        self.cluster_a = ObjectId()
+        self.cluster_b = ObjectId()
+        self.fragment_a = ObjectId()
+        self.fragment_b = ObjectId()
+
+    def test_no_move_still_checks_all_eligible_fragments(self):
+        fragments = {
+            str(self.fragment_a): {
+                "_id": self.fragment_a,
+                "cluster_id": self.cluster_a,
+                "feedback_cluster_id": None,
+            },
+            str(self.fragment_b): {
+                "_id": self.fragment_b,
+                "cluster_id": self.cluster_b,
+                "feedback_cluster_id": None,
+            },
+        }
+        clusters = {
+            str(self.cluster_a): {"_id": self.cluster_a, "fragment_ids": [self.fragment_a]},
+            str(self.cluster_b): {"_id": self.cluster_b, "fragment_ids": [self.fragment_b]},
+        }
+
+        errors, details = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [],
+        )
+
+        self.assertEqual([], errors)
+        self.assertEqual("all_eligible", details["scope"])
+        self.assertEqual(2, details["eligible_fragments"])
+        self.assertEqual(0, details["moved_fragments"])
+
+    def test_unmoved_duplicate_membership_is_rejected(self):
+        fragments = {
+            str(self.fragment_a): {
+                "_id": self.fragment_a,
+                "cluster_id": self.cluster_a,
+                "feedback_cluster_id": None,
+            },
+        }
+        clusters = {
+            str(self.cluster_a): {"_id": self.cluster_a, "fragment_ids": [self.fragment_a]},
+            str(self.cluster_b): {"_id": self.cluster_b, "fragment_ids": [self.fragment_a]},
+        }
+
+        errors, _ = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [],
+        )
+
+        self.assertTrue(any("2 current cluster memberships" in error for error in errors))
+
+    def test_unmoved_missing_membership_is_rejected(self):
+        fragments = {
+            str(self.fragment_a): {
+                "_id": self.fragment_a,
+                "cluster_id": self.cluster_a,
+                "feedback_cluster_id": None,
+            },
+        }
+        clusters = {
+            str(self.cluster_a): {"_id": self.cluster_a, "fragment_ids": []},
+        }
+
+        errors, _ = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [],
+        )
+
+        self.assertTrue(any("0 current cluster memberships" in error for error in errors))
+
+    def test_unmoved_membership_cluster_must_match_fragment_cluster(self):
+        fragments = {
+            str(self.fragment_a): {
+                "_id": self.fragment_a,
+                "cluster_id": self.cluster_a,
+                "feedback_cluster_id": None,
+            },
+        }
+        clusters = {
+            str(self.cluster_a): {"_id": self.cluster_a, "fragment_ids": []},
+            str(self.cluster_b): {"_id": self.cluster_b, "fragment_ids": [self.fragment_a]},
+        }
+
+        errors, _ = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [],
+        )
+
+        self.assertTrue(
+            any("membership disagrees with fragment.cluster_id" in error for error in errors)
+        )
+
+    def test_moved_fragment_retains_final_projection_checks(self):
+        event = {
+            "_id": ObjectId(),
+            "fragment_id": self.fragment_a,
+            "from_cluster_id": self.cluster_a,
+            "to_cluster_id": self.cluster_b,
+            "timestamp": datetime.now(timezone.utc),
+        }
+        fragments = {
+            str(self.fragment_a): {
+                "_id": self.fragment_a,
+                "cluster_id": self.cluster_b,
+                "feedback_cluster_id": self.cluster_b,
+            },
+        }
+        clusters = {
+            str(self.cluster_a): {"_id": self.cluster_a, "fragment_ids": []},
+            str(self.cluster_b): {"_id": self.cluster_b, "fragment_ids": [self.fragment_a]},
+        }
+
+        errors, details = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [event],
+        )
+
+        self.assertEqual([], errors)
+        self.assertEqual(1, details["moved_fragments"])
+
+        fragments[str(self.fragment_a)]["feedback_cluster_id"] = self.cluster_a
+        errors, _ = MODULE.evaluate_post_move_projection(
+            fragments,
+            clusters,
+            set(fragments),
+            [event],
+        )
+        self.assertTrue(
+            any("feedback_cluster_id disagrees with final move" in error for error in errors)
         )
 
 

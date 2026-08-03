@@ -24,6 +24,8 @@ from pymongo.uri_parser import parse_uri
 
 G2 = "544540beedb707c2be5c08fa1647107f80587c84"
 SCHEMA_VERSION = "stage_d_structured_output_v1"
+INTEGRITY_SCHEMA_VERSION = "formal_session_integrity_v2"
+CHECK6_SCOPE = "all_eligible"
 
 
 @dataclass(frozen=True)
@@ -123,6 +125,58 @@ def count_integrity_errors(entries: Iterable[dict[str, Any]], participant: str, 
         and str(item.get("doc_id", "")) in assigned_doc_ids
         and str(item.get("action", "")).strip() in {"confirm", "move"}
     )
+
+
+def evaluate_post_move_projection(
+    fragment_by_id: dict[str, dict[str, Any]],
+    cluster_by_id: dict[str, dict[str, Any]],
+    eligible_ids: set[str],
+    move_events: list[dict[str, Any]],
+) -> tuple[list[str], dict[str, int | str]]:
+    """Validate the current graph projection for every eligible fragment.
+
+    The move-event checks retain the historical final-destination and
+    feedback-cluster assertions.  The membership assertions deliberately cover
+    the full eligible set so a no-move document is still checked and baseline
+    drift cannot hide behind move-only applicability.
+    """
+    errors: list[str] = []
+    memberships: dict[str, list[str]] = {}
+    for cluster_id, cluster in cluster_by_id.items():
+        for fragment_oid in cluster.get("fragment_ids") or []:
+            memberships.setdefault(str(fragment_oid), []).append(cluster_id)
+
+    for fragment_id in sorted(eligible_ids):
+        fragment = fragment_by_id.get(fragment_id) or {}
+        current_cluster = fragment.get("cluster_id")
+        member_clusters = memberships.get(fragment_id, [])
+        if len(member_clusters) != 1:
+            errors.append(
+                f"eligible fragment has {len(member_clusters)} current cluster memberships: {fragment_id}"
+            )
+        elif not _same_id(member_clusters[0], current_cluster):
+            errors.append(
+                f"cluster membership disagrees with fragment.cluster_id for {fragment_id}"
+            )
+
+    moved_fragment_ids = sorted({str(event["fragment_id"]) for event in move_events})
+    for fragment_id in moved_fragment_ids:
+        chain = sorted(
+            (event for event in move_events if str(event["fragment_id"]) == fragment_id),
+            key=lambda event: (event.get("timestamp"), event.get("_id")),
+        )
+        final_destination = chain[-1].get("to_cluster_id")
+        fragment = fragment_by_id.get(fragment_id) or {}
+        if not _same_id(fragment.get("cluster_id"), final_destination):
+            errors.append(f"fragment.cluster_id disagrees with final move for {fragment_id}")
+        if not _same_id(fragment.get("feedback_cluster_id"), final_destination):
+            errors.append(f"fragment.feedback_cluster_id disagrees with final move for {fragment_id}")
+
+    return sorted(set(errors)), {
+        "scope": CHECK6_SCOPE,
+        "eligible_fragments": len(eligible_ids),
+        "moved_fragments": len(moved_fragment_ids),
+    }
 
 
 def _validate_endpoint(uri: str, db_name: str, mode: str) -> None:
@@ -343,34 +397,18 @@ def verify_document(db: Any, participant: str, doc: ApprovedDocument, assigned_d
         details={"moved_fragments": len(moved_fragment_ids), "move_events": len(move_events)},
     )
 
-    # Check 6: post-move projection, move-only scope.
-    errors6: list[str] = []
-    memberships: dict[str, list[str]] = {}
-    for cluster_id, cluster in cluster_by_id.items():
-        for fragment_oid in cluster.get("fragment_ids") or []:
-            memberships.setdefault(str(fragment_oid), []).append(cluster_id)
-    for fragment_id in moved_fragment_ids:
-        chain = sorted(
-            (event for event in move_events if str(event["fragment_id"]) == fragment_id),
-            key=lambda event: (event.get("timestamp"), event.get("_id")),
-        )
-        final_destination = chain[-1].get("to_cluster_id")
-        fragment = fragment_by_id.get(fragment_id) or {}
-        if not _same_id(fragment.get("cluster_id"), final_destination):
-            errors6.append(f"fragment.cluster_id disagrees with final move for {fragment_id}")
-        if not _same_id(fragment.get("feedback_cluster_id"), final_destination):
-            errors6.append(f"fragment.feedback_cluster_id disagrees with final move for {fragment_id}")
-        member_clusters = memberships.get(fragment_id, [])
-        if len(member_clusters) != 1:
-            errors6.append(f"fragment has {len(member_clusters)} current cluster memberships: {fragment_id}")
-        elif member_clusters[0] != str(final_destination):
-            errors6.append(f"cluster membership disagrees with final move for {fragment_id}")
+    # Check 6: post-move fields plus all-eligible membership projection.
+    errors6, check6_details = evaluate_post_move_projection(
+        fragment_by_id,
+        cluster_by_id,
+        eligible_ids,
+        move_events,
+    )
     check6 = _finding(
         6,
         "post_move_projection",
-        sorted(set(errors6)),
-        applicable=bool(move_events),
-        details={"moved_fragments": len(moved_fragment_ids)},
+        errors6,
+        details=check6_details,
     )
 
     return {
@@ -459,13 +497,14 @@ def main() -> int:
     statuses = [check["status"] for result in results for check in result["checks"]]
     overall = "PASS" if "FAIL" not in statuses else "FAIL"
     output = {
-        "schema": "formal_session_integrity_v1",
+        "schema": INTEGRITY_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": args.mode,
         "database": args.db_name,
         "participant": participant,
         "endpoint": "127.0.0.1:27018" if args.mode == "pilot" else "127.0.0.1:27017",
         "read_only_design": True,
+        "check6_scope": CHECK6_SCOPE,
         "script_sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
         "repository_head": head,
         "repository_worktree_clean": clean,

@@ -605,7 +605,7 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 | `integrity_N > 0`，但脚本正常、数据库/participant/doc 身份正确 | 保存原始日志并逐条对账；按上述预注册规则报告和调整指标，**不因 N 非零单独停掉后续 participant**。 |
 | 完整性脚本自身异常、未生成可信输出或退出码非零 | 停线，不开始下一名 participant；保留输出并核查工具或适用检查的 FAIL。 |
 | 数据库、正式 participant、whitelist doc/run 身份不匹配 | 立即停线；隔离受影响 participant-document，等待单独裁定，不删除或自动宣布整场有效/无效。 |
-| 本应适用的检查返回 `NA` | 停线核查作用域；但某文档没有任何 move 时，检查 5/6 返回 `NA` 是预注册的正常结果，不触发停线。 |
+| 本应适用的检查返回 `NA` | 停线核查作用域；仅检查 5 在某文档没有任何 move 时允许返回 `NA`。检查 6 覆盖全部 eligible fragments，始终适用，不得返回 `NA`。 |
 
 `overall_status` 只汇总六项检查的 PASS/FAIL，不含 `integrity_N`；因此不得把
 “`overall_status=PASS` 且 `N=0`”写成继续下一场的联合门槛。
@@ -631,15 +631,22 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
    participant 操作前的 assignment；后续每条 move 的 from 必须等于前一条
    move 的 to。没有 move 的 confirm-only 或未审查 fragment 记为 `NA`，
    不能因不适用而判 FAIL。
-6. **Move 后数据库投影：**仅对发生过 move 的 fragment 及其受影响 clusters
-   检查。fragment 当前 `cluster_id`/`feedback_cluster_id`、最后一条 move
-   的 `to_cluster_id` 与 cluster `fragment_ids` membership 必须一致，且
-   该 fragment 只属于一个当前 cluster。未受 move 影响的 fragment/clusters
-   不属于本项覆盖范围；本项不声称验证整个数据库或模型输出质量。
+6. **当前数据库投影（all-eligible scope）：**对该正式文档的每个 eligible
+   fragment 检查其恰好出现在一个当前 cluster 的 `fragment_ids` 中，且该
+   membership 与 fragment 当前 `cluster_id` 一致。对发生过 move 的 fragment
+   另检查当前 `cluster_id`、`feedback_cluster_id` 与最后一条 move 的
+   `to_cluster_id` 一致。没有 move 的文档仍须执行并返回 PASS/FAIL，不得记为
+   `NA`。本项验证当前 graph projection 的结构一致性，不判断 participant 决策或
+   cluster 质量，也不把当前投影视为不可变的原始 AI assignment。
 
 检查 5/6 是针对 recluster 副作用与事件链的完整性门禁，不是参与者判断或
 cluster 质量指标。任一适用检查为 FAIL 时，保存原始证据并暂停分析；不得把
 FAIL 改记为 `NA`，也不得用清理数据的方式使检查通过。
+
+检查 5 的作用域保持 move-only；检查 6 自
+`formal_session_integrity_v2` 起扩展为 all-eligible scope。该扩展是第一场正式
+session 前的预注册完整性收紧，不改变 participant-facing React UI、数据库写入
+行为、九份正式文档、G2 生成仪器或三场固定 session endpoint。
 
 版本化只读实现位于
 `docs/verification_tools/formal_session_integrity.py`。脚本把 browser 原始失败
@@ -649,10 +656,13 @@ ID、计数与 PASS/FAIL/NA，不读取或输出 fragment 文本、HTML、embedd
 research question 或密钥。正式运行必须提供未经编辑的浏览器日志文件；PILOT
 门禁可用其已保存的原始 `null` 证据。
 
-第一场前的 `nie_pilot` 实跑已于 2026-08-01 完成：三份 P2 彩排文档的检查
-1–4 均为 PASS；无 move 的单簇 task1 在检查 5/6 为预期 `NA`，其余两份文档的
-检查 5/6 均为 PASS；integrity `N=0`。脚本、完整 hash、逐项结果和环境尝试台账见
-`docs/verification_records/formal_session_integrity_pilot_gate.md`。
+历史 v1 门禁已于 2026-08-01 在 `nie_pilot` 完成：三份 P2 彩排文档的检查
+1–4 均为 PASS；无 move 的单簇 task1 在当时的 move-only 检查 5/6 为 `NA`，
+其余两份文档的检查 5/6 均为 PASS；integrity `N=0`。这份结果只证明 v1 的既定
+作用域，不得改写为 all-eligible 实测。脚本、完整 hash、逐项结果和环境尝试台账见
+`docs/verification_records/formal_session_integrity_pilot_gate.md`。v2 的实现、单测
+及第一场前 `nie_pilot` 复核另见
+`docs/verification_records/formal_session_integrity_v2.md`。
 
 分析表中的 `final confirm` / `final move` 是每个 fragment 依
 `{timestamp:-1,_id:-1}` 得到的裁定终态，不是原始事件数。若同一 fragment
@@ -835,3 +845,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-08-01 | 在第一场正式 session 前记录 ERGO/FEC 门户 `Approved` 状态及无独立 PDF 批准函的证据边界；固定六点 briefing、统一结束问题、participant×document 两阶段质性观察编码、结构性 merge `n/a`、三张空白现场记录表和只读六项一致性检查工具。参与者仪器仍固定为 `ddb5355972ca63df44edad184b11e30f420e4c62`。 |
 | 2026-08-02 | 在第一场正式 session 前完成最后一次 docs-only 协议冻结：澄清 `N>0` 不单独停线及四类事件处置；固定外部 45 分钟计时、录音回放/存活检查、含糊发言全量现场捕获，以及 P1/P2/P3 三份等价双簇 demo 文档、`DEMO_Px` 身份和双重分析排除。参与者代码端点仍未改变。 |
 | 2026-08-02 | 在第一场正式 session 前依据 ERGO 115447 覆盖核实另立修订：观察笔记收紧为录音定位工具，只记录音时间点与 3–5 个关键词；准确原话和质性编码依据改为已批准录音的转录。三值、判定、汇总及分析口径不变；父提交 `0044d24ba8575e9e3216c177f50110d2a422d149` 未 amend。 |
+| 2026-08-03 | 在第一场正式 session 前把一致性检查 6 从 move-only 扩展为 all-eligible 当前投影检查；检查 5 仍为 move-only。无 move 文档现在只允许检查 5 为 `NA`，检查 6 必须 PASS/FAIL。该 docs/只读分析工具修订不改变 participant-facing session endpoint 或数据库行为。 |
