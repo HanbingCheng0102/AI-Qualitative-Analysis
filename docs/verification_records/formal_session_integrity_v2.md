@@ -99,12 +99,14 @@ The temporary mongod shut down cleanly with exit code 0. Post-run listeners on
 ## Fail-closed attempt ledger
 
 Two preflight attempts stopped before creating the run directory, restoring a
-database or invoking the checker because an automatically restarted Ollama
-process was listening on port 11434. The blocking process was identified as
-Ollama server PID 7256, launched by Ollama desktop-app PID 16664. Only those two
-identified PIDs were stopped. Ports 27017, 27018 and 11434 were then rechecked as
-clear before the accepted run. These were environment-gate failures with zero
-database side effects, not Check-6 results.
+database or invoking the checker. The first preserved only that at least one of
+ports 27017, 27018 or 11434 had a prohibited listener; an immediate diagnostic
+check found all three clear, so the exact transient port and PID were not
+preserved and are not inferred here. The second attempt explicitly identified
+Ollama server PID 7256 on port 11434, launched by Ollama desktop-app PID 16664.
+Only those two identified PIDs were stopped. Ports 27017, 27018 and 11434 were
+then rechecked as clear before the accepted run. These were environment-gate
+failures with zero database side effects, not Check-6 results.
 
 ## Interpretation
 
