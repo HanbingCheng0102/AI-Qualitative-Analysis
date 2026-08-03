@@ -61,6 +61,91 @@ class AssignmentTests(unittest.TestCase):
         )
 
 
+class ParticipantFeedbackScopeTests(unittest.TestCase):
+    def _registered_events(self):
+        return [
+            {
+                "_id": ObjectId(feedback_id),
+                "doc_id": ObjectId(specification["doc_id"]),
+                "participant_id": "P1",
+                "action": specification["action"],
+                "timestamp": datetime.fromisoformat(
+                    specification["timestamp"].replace("Z", "+00:00")
+                ),
+            }
+            for feedback_id, specification in
+            MODULE.HISTORICAL_FEEDBACK_EXCLUSIONS["P1"].items()
+        ]
+
+    def test_exact_registered_development_events_are_excluded(self):
+        errors, details = MODULE.evaluate_participant_feedback_scope(
+            self._registered_events(),
+            "P1",
+            {"formal-a", "formal-b", "formal-c"},
+        )
+
+        self.assertEqual([], errors)
+        self.assertEqual(
+            sorted(MODULE.HISTORICAL_FEEDBACK_EXCLUSIONS["P1"]),
+            details["pre_registered_excluded_feedback_ids"],
+        )
+        self.assertEqual([], details["out_of_assignment_doc_ids"])
+
+    def test_new_event_on_same_development_document_is_not_excluded(self):
+        events = self._registered_events()
+        events.append({
+            "_id": ObjectId(),
+            "doc_id": ObjectId("6a5616310536f5c49a509277"),
+            "participant_id": "P1",
+            "action": "confirm",
+            "timestamp": datetime.now(timezone.utc),
+        })
+
+        errors, details = MODULE.evaluate_participant_feedback_scope(
+            events,
+            "P1",
+            {"formal-a", "formal-b", "formal-c"},
+        )
+
+        self.assertIn(
+            "participant has feedback outside the assigned three documents",
+            errors,
+        )
+        self.assertEqual(
+            ["6a5616310536f5c49a509277"],
+            details["out_of_assignment_doc_ids"],
+        )
+
+    def test_registered_event_fingerprint_change_is_rejected(self):
+        events = self._registered_events()
+        events[0]["action"] = "confirm"
+
+        errors, _ = MODULE.evaluate_participant_feedback_scope(
+            events,
+            "P1",
+            {"formal-a", "formal-b", "formal-c"},
+        )
+
+        self.assertTrue(
+            any("fingerprint mismatch" in error for error in errors)
+        )
+
+    def test_missing_registered_event_is_rejected(self):
+        events = self._registered_events()[1:]
+
+        errors, details = MODULE.evaluate_participant_feedback_scope(
+            events,
+            "P1",
+            {"formal-a", "formal-b", "formal-c"},
+        )
+
+        self.assertIn(
+            "pre-registered historical feedback is absent or deleted",
+            errors,
+        )
+        self.assertEqual(1, len(details["missing_pre_registered_feedback_ids"]))
+
+
 class PostMoveProjectionTests(unittest.TestCase):
     def setUp(self):
         self.cluster_a = ObjectId()

@@ -24,8 +24,29 @@ from pymongo.uri_parser import parse_uri
 
 G2 = "544540beedb707c2be5c08fa1647107f80587c84"
 SCHEMA_VERSION = "stage_d_structured_output_v1"
-INTEGRITY_SCHEMA_VERSION = "formal_session_integrity_v2"
+INTEGRITY_SCHEMA_VERSION = "formal_session_integrity_v3"
 CHECK6_SCOPE = "all_eligible"
+HISTORICAL_FEEDBACK_EXCLUSION_VERSION = "pre_session_development_feedback_v1"
+
+HISTORICAL_FEEDBACK_EXCLUSIONS = {
+    "P1": {
+        "6a57a40ef8d6639908e72349": {
+            "doc_id": "6a5616310536f5c49a509277",
+            "action": "move",
+            "timestamp": "2026-07-15T15:15:26.447Z",
+        },
+        "6a57a80726831fb4dded3f12": {
+            "doc_id": "6a5616310536f5c49a509277",
+            "action": "confirm",
+            "timestamp": "2026-07-15T15:32:23.594Z",
+        },
+        "6a57a82e26831fb4dded3f13": {
+            "doc_id": "6a5616310536f5c49a509277",
+            "action": "move",
+            "timestamp": "2026-07-15T15:33:02.497Z",
+        },
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -78,6 +99,70 @@ def _finding(number: int, name: str, errors: list[str], *, applicable: bool = Tr
 
 def _same_id(left: Any, right: Any) -> bool:
     return left is not None and right is not None and str(left) == str(right)
+
+
+def _utc_millisecond_timestamp(value: Any) -> str | None:
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return (
+        value.astimezone(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def evaluate_participant_feedback_scope(
+    events: list[dict[str, Any]],
+    participant: str,
+    assigned_doc_ids: set[str],
+) -> tuple[list[str], dict[str, Any]]:
+    """Separate exact pre-registered development events from session scope.
+
+    Exclusions are event-specific fingerprints, never document-wide.  A new
+    event on the same development document therefore remains an error.
+    """
+    expected = HISTORICAL_FEEDBACK_EXCLUSIONS.get(participant, {})
+    seen_expected: set[str] = set()
+    excluded_ids: list[str] = []
+    out_of_assignment_doc_ids: set[str] = set()
+    errors: list[str] = []
+
+    for event in events:
+        feedback_id = str(event.get("_id"))
+        doc_id = str(event.get("doc_id"))
+        specification = expected.get(feedback_id)
+        if specification is not None:
+            seen_expected.add(feedback_id)
+            actual_fingerprint = {
+                "doc_id": doc_id,
+                "action": event.get("action"),
+                "timestamp": _utc_millisecond_timestamp(event.get("timestamp")),
+            }
+            if actual_fingerprint != specification:
+                errors.append(
+                    f"pre-registered historical feedback fingerprint mismatch: {feedback_id}"
+                )
+            else:
+                excluded_ids.append(feedback_id)
+            continue
+
+        if doc_id not in assigned_doc_ids:
+            out_of_assignment_doc_ids.add(doc_id)
+
+    missing_ids = sorted(set(expected) - seen_expected)
+    if missing_ids:
+        errors.append("pre-registered historical feedback is absent or deleted")
+    if out_of_assignment_doc_ids:
+        errors.append("participant has feedback outside the assigned three documents")
+
+    return sorted(set(errors)), {
+        "historical_exclusion_version": HISTORICAL_FEEDBACK_EXCLUSION_VERSION,
+        "pre_registered_excluded_feedback_ids": sorted(excluded_ids),
+        "missing_pre_registered_feedback_ids": missing_ids,
+        "out_of_assignment_doc_ids": sorted(out_of_assignment_doc_ids),
+    }
 
 
 def _expected_params(doc: ApprovedDocument) -> dict[str, Any]:
@@ -280,15 +365,15 @@ def verify_document(db: Any, participant: str, doc: ApprovedDocument, assigned_d
     # Check 2: participant and eligible scope.
     errors2: list[str] = []
     participant_events_all_docs = list(db["clusterFeedback"].find(
-        {"participant_id": participant}, {"doc_id": 1}
+        {"participant_id": participant},
+        {"doc_id": 1, "participant_id": 1, "action": 1, "timestamp": 1},
     ))
-    out_of_assignment = sorted({
-        str(event.get("doc_id"))
-        for event in participant_events_all_docs
-        if str(event.get("doc_id")) not in assigned_doc_ids
-    })
-    if out_of_assignment:
-        errors2.append("participant has feedback outside the assigned three documents")
+    scope_errors, scope_details = evaluate_participant_feedback_scope(
+        participant_events_all_docs,
+        participant,
+        assigned_doc_ids,
+    )
+    errors2.extend(scope_errors)
     for event in events:
         fragment_id = str(event.get("fragment_id"))
         if event.get("participant_id") != participant:
@@ -304,7 +389,7 @@ def verify_document(db: Any, participant: str, doc: ApprovedDocument, assigned_d
     check2 = _finding(2, "participant_eligible_scope", sorted(set(errors2)), details={
         "eligible": len(eligible_ids),
         "feedback_events": len(events),
-        "out_of_assignment_doc_ids": out_of_assignment,
+        **scope_details,
     })
 
     # Check 3: action and reference integrity.
@@ -505,6 +590,7 @@ def main() -> int:
         "endpoint": "127.0.0.1:27018" if args.mode == "pilot" else "127.0.0.1:27017",
         "read_only_design": True,
         "check6_scope": CHECK6_SCOPE,
+        "historical_feedback_exclusion_version": HISTORICAL_FEEDBACK_EXCLUSION_VERSION,
         "script_sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
         "repository_head": head,
         "repository_worktree_clean": clean,
