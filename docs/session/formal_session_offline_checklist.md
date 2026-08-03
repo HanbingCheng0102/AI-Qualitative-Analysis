@@ -58,10 +58,13 @@ gate. Do not rely on memory or a moving branch name.
 - [ ] Recording stopped and stored under the approved plan.
 - [ ] Browser failure log exported unedited; raw integrity count `N` recorded.
 - [ ] React/API/AI stopped; only then detached to integrity-tool commit
-      `f34856a072d6761b44decdfd77963cf3fcee550b` with a clean worktree.
-- [ ] `git diff --exit-code 0e37f187d95db5f10cb6892cc2a97b543a5bd4eb..f34856a072d6761b44decdfd77963cf3fcee550b -- . ':(exclude)docs'`
+      `5eec829db35c8c2ecf370ed444c2c8b3e2f82e6e` with a clean worktree.
+- [ ] `git diff --exit-code 0e37f187d95db5f10cb6892cc2a97b543a5bd4eb..5eec829db35c8c2ecf370ed444c2c8b3e2f82e6e -- . ':(exclude)docs'`
       produced no output; no participant-facing service was started from the tool commit.
 - [ ] Six-check script run once; `N` and all metrics generated in the same output.
+- [ ] For P1, Check 2 reported exactly the three pre-registered historical
+      feedback IDs and an empty `out_of_assignment_doc_ids`; no document-wide
+      exemption was used.
 - [ ] Output and raw evidence preserved; no database repair or silent retry.
 
 ## Post-check continuation decision

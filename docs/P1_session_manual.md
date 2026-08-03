@@ -132,7 +132,7 @@ checkout 到下述 session UI operational commit；该 commit 的 full hash 由
 | Session UI validation record | `docs/verification_records/session_card_readability_v1.md` |
 | Session UI operational commit | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb` |
 | Session checkout endpoint | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`（三场固定，不跟随分支移动） |
-| Formal integrity v2 tool commit | `f34856a072d6761b44decdfd77963cf3fcee550b`（只在 participant-facing 服务停止后运行） |
+| Formal integrity v3 tool commit | `5eec829db35c8c2ecf370ed444c2c8b3e2f82e6e`（只在 participant-facing 服务停止后运行） |
 | Historical audit → UI endpoint API/AI diff | 必须无输出；UI 改动只允许位于 `react-client/src/views/ClusterGraphView.jsx` 与 `docs/` |
 | Session UI operational → audit HEAD 非 docs diff | 必须无输出 |
 | Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |
@@ -520,6 +520,7 @@ private ledger；九个正式文档完成后在 S 中一次性回填本表，避
 | `D_SMOKE_G2_QWEN_batchA` | G2 Qwen 20 行配置/provider/schema smoke；completed | `6a661d1ec2a3cea7e6de6028` |
 | `D_SMOKE_G2_AZURE_batchA` | G2 Azure deployment/schema 20 行 smoke；completed | `6a661f814b63e7a3c45dd144` |
 | `P1_task2_batchB` | 2026-07-16 历史开发文档；与未来 Azure 正式文档同名 | `6a58d2cd1d6d1e80c35ba564` |
+| `manual_test_1` | 2026-07-15 历史开发文档；含三条误用正式身份 `P1` 的预存 feedback；精确事件级排除，不得整文档宽免 | `6a5616310536f5c49a509277` |
 | `R5_OLLAMA_SAMPLING_batchA` | 历史 sampling 诊断文档；只作为 demo 初始投影来源，不向正式 participant 打开 | `6a5cfca621fc0a91ba66e692` |
 | `D_SESSION_DEMO_P1` | P1 专属界面演示副本；20 fragments、2 clusters；永不分析 | `6a6f8bd596018eb206d7ead2` |
 | `D_SESSION_DEMO_P2` | P2 专属界面演示副本；20 fragments、2 clusters；永不分析 | `6a6f8bd696018eb206d7eae7` |
@@ -621,6 +622,12 @@ G2 ingest 直接返回且 `code_version` 等于 G2 tag target 的新 doc/run。
 2. **Participant 与 eligible 范围：**feedback participant 精确为该场
    `P1`/`P2`/`P3`，doc 属于其固定矩阵；每个 feedback fragment 属于该 doc
    的 eligible fragment 集，不混入 filtered、PILOT、TEST 或开发记录。
+   第一场前发现 `manual_test_1 / 6a5616310536f5c49a509277` 已有三条
+   2026-07-15 开发事件误用 `P1` 身份。v3 只按完整 fingerprint 精确排除
+   feedback ID `6a57a40ef8d6639908e72349`、`6a57a80726831fb4dded3f12`、
+   `6a57a82e26831fb4dded3f13`；fingerprint 同时锁定 doc、action 与 timestamp。
+   任一历史事件缺失/变化，或该开发文档出现任何新增第四条 `P1` 事件，检查 2
+   均须 FAIL。不得删除历史记录，也不得把整个开发 doc 加入宽松豁免。
 3. **Action 与引用完整性：**正式定量 action 只含 `confirm`/`move`；所有
    doc、fragment、from/to cluster 引用存在且属于同一正式文档；move 的
    from/to 不相同。
@@ -660,7 +667,7 @@ research question 或密钥。正式运行必须提供未经编辑的浏览器�
 参与者可见服务与事后完整性工具使用两个精确端点，顺序不得混淆：正式任务期间
 必须 detached 在 `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`；任务结束、录音与未经编辑的
 browser failure log 均已封存、React/API/AI 全部停止后，才可 detached 到
-`f34856a072d6761b44decdfd77963cf3fcee550b` 运行 v2 只读检查。不得从 `f34856a…`
+`5eec829db35c8c2ecf370ed444c2c8b3e2f82e6e` 运行 v3 只读检查。不得从 `5eec829…`
 启动 participant-facing UI；下一场开始前必须重新 detached 回 `0e37f187…` 并重走
 session 前门禁。该工具 commit 相对 UI endpoint 的非 `docs/` diff 必须无输出。
 
@@ -670,7 +677,9 @@ session 前门禁。该工具 commit 相对 UI endpoint 的非 `docs/` diff 必�
 作用域，不得改写为 all-eligible 实测。脚本、完整 hash、逐项结果和环境尝试台账见
 `docs/verification_records/formal_session_integrity_pilot_gate.md`。v2 的实现、单测
 及第一场前 `nie_pilot` 复核另见
-`docs/verification_records/formal_session_integrity_v2.md`。
+`docs/verification_records/formal_session_integrity_v2.md`。v3 的精确历史事件排除、
+两次隔离门禁及正式 P1 零写入 preflight 见
+`docs/verification_records/formal_session_integrity_v3.md`。
 
 分析表中的 `final confirm` / `final move` 是每个 fragment 依
 `{timestamp:-1,_id:-1}` 得到的裁定终态，不是原始事件数。若同一 fragment
@@ -854,3 +863,4 @@ relevance 判定或完整 coding accuracy。`move` 只表示参与者把 fragmen
 | 2026-08-02 | 在第一场正式 session 前完成最后一次 docs-only 协议冻结：澄清 `N>0` 不单独停线及四类事件处置；固定外部 45 分钟计时、录音回放/存活检查、含糊发言全量现场捕获，以及 P1/P2/P3 三份等价双簇 demo 文档、`DEMO_Px` 身份和双重分析排除。参与者代码端点仍未改变。 |
 | 2026-08-02 | 在第一场正式 session 前依据 ERGO 115447 覆盖核实另立修订：观察笔记收紧为录音定位工具，只记录音时间点与 3–5 个关键词；准确原话和质性编码依据改为已批准录音的转录。三值、判定、汇总及分析口径不变；父提交 `0044d24ba8575e9e3216c177f50110d2a422d149` 未 amend。 |
 | 2026-08-03 | 在第一场正式 session 前把一致性检查 6 从 move-only 扩展为 all-eligible 当前投影检查；检查 5 仍为 move-only。无 move 文档现在只允许检查 5 为 `NA`，检查 6 必须 PASS/FAIL。该 docs/只读分析工具修订不改变 participant-facing session endpoint 或数据库行为。 |
+| 2026-08-03 | P1 开场前门禁发现历史 `manual_test_1` 有三条 2026-07-15 开发 feedback 误用正式身份 `P1`。记录原样保留；完整性工具 v3 只按三个精确事件 fingerprint 排除，新增、缺失或变化均 fail closed。participant-facing endpoint 与正式数据库写入行为不变。 |
