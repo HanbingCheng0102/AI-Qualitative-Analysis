@@ -132,6 +132,7 @@ checkout 到下述 session UI operational commit；该 commit 的 full hash 由
 | Session UI validation record | `docs/verification_records/session_card_readability_v1.md` |
 | Session UI operational commit | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb` |
 | Session checkout endpoint | `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`（三场固定，不跟随分支移动） |
+| Formal integrity v2 tool commit | `f34856a072d6761b44decdfd77963cf3fcee550b`（只在 participant-facing 服务停止后运行） |
 | Historical audit → UI endpoint API/AI diff | 必须无输出；UI 改动只允许位于 `react-client/src/views/ClusterGraphView.jsx` 与 `docs/` |
 | Session UI operational → audit HEAD 非 docs diff | 必须无输出 |
 | Session 前 prompt hash 复核 | 每次 session 前运行；必须通过 |
@@ -655,6 +656,13 @@ session 前的预注册完整性收紧，不改变 participant-facing React UI�
 ID、计数与 PASS/FAIL/NA，不读取或输出 fragment 文本、HTML、embedding、
 research question 或密钥。正式运行必须提供未经编辑的浏览器日志文件；PILOT
 门禁可用其已保存的原始 `null` 证据。
+
+参与者可见服务与事后完整性工具使用两个精确端点，顺序不得混淆：正式任务期间
+必须 detached 在 `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb`；任务结束、录音与未经编辑的
+browser failure log 均已封存、React/API/AI 全部停止后，才可 detached 到
+`f34856a072d6761b44decdfd77963cf3fcee550b` 运行 v2 只读检查。不得从 `f34856a…`
+启动 participant-facing UI；下一场开始前必须重新 detached 回 `0e37f187…` 并重走
+session 前门禁。该工具 commit 相对 UI endpoint 的非 `docs/` diff 必须无输出。
 
 历史 v1 门禁已于 2026-08-01 在 `nie_pilot` 完成：三份 P2 彩排文档的检查
 1–4 均为 PASS；无 move 的单簇 task1 在当时的 move-only 检查 5/6 为 `NA`，

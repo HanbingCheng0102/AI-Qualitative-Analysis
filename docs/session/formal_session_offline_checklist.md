@@ -57,6 +57,10 @@ gate. Do not rely on memory or a moving branch name.
 - [ ] Asked exactly once: “整体感受如何？”; no follow-up/comparison question.
 - [ ] Recording stopped and stored under the approved plan.
 - [ ] Browser failure log exported unedited; raw integrity count `N` recorded.
+- [ ] React/API/AI stopped; only then detached to integrity-tool commit
+      `f34856a072d6761b44decdfd77963cf3fcee550b` with a clean worktree.
+- [ ] `git diff --exit-code 0e37f187d95db5f10cb6892cc2a97b543a5bd4eb..f34856a072d6761b44decdfd77963cf3fcee550b -- . ':(exclude)docs'`
+      produced no output; no participant-facing service was started from the tool commit.
 - [ ] Six-check script run once; `N` and all metrics generated in the same output.
 - [ ] Output and raw evidence preserved; no database repair or silent retry.
 
@@ -71,3 +75,5 @@ gate. Do not rely on memory or a moving branch name.
 - [ ] Unexpected `NA` caused a scope check. Only Check 5 was allowed to be `NA`
       where the document had no move; all-eligible Check 6 returned PASS or FAIL.
 - [ ] `overall_status` was not combined with `N=0` as a joint continuation gate.
+- [ ] Before the next participant, detached back to session endpoint
+      `0e37f187d95db5f10cb6892cc2a97b543a5bd4eb` and repeated the pre-session gates.
